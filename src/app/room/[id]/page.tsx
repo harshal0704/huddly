@@ -1,34 +1,45 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, use } from "react";
 import { motion } from "framer-motion";
 import PhaserGame from "@/game/PhaserGame";
 import { createRoomScene } from "@/game/scenes/RoomScene";
+import type { MapTemplate } from "@/game/scenes/RoomScene";
 import ChatSidebar from "@/components/room/ChatSidebar";
 import EmoteWheel from "@/components/room/EmoteWheel";
 import ParticipantsList from "@/components/room/ParticipantsList";
 import Minimap from "@/components/room/Minimap";
 import RoomToolbar from "@/components/room/RoomToolbar";
 
+// Demo room metadata
+const DEMO_ROOMS: Record<string, { name: string; template: MapTemplate; online: number }> = {
+    demo: { name: "Demo Classroom", template: "classroom", online: 9 },
+    office: { name: "Team Office", template: "office", online: 5 },
+    cafe: { name: "Coffee Lounge", template: "cafe", online: 7 },
+    conference: { name: "Tech Talk Hall", template: "conference", online: 12 },
+    party: { name: "Friday Vibes 🎉", template: "party", online: 15 },
+};
+
 interface RoomPageProps {
     params: Promise<{ id: string }>;
 }
 
 export default function RoomPage({ params }: RoomPageProps) {
+    const { id } = use(params);
+    const roomInfo = DEMO_ROOMS[id] || DEMO_ROOMS.demo;
+
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isMinimapOpen, setIsMinimapOpen] = useState(true);
     const [isEmoteOpen, setIsEmoteOpen] = useState(false);
-    const [showControls, setShowControls] = useState(true);
 
     const handleEmoteSelect = useCallback((emoji: string) => {
         console.log("Emote selected:", emoji);
-        // In a real app, this would broadcast the emote to other players
     }, []);
 
-    const sceneConfig = createRoomScene();
+    const sceneConfig = createRoomScene(roomInfo.template);
 
     return (
         <div className="relative w-screen h-screen bg-[#1a1025] overflow-hidden">
@@ -40,8 +51,8 @@ export default function RoomPage({ params }: RoomPageProps) {
             >
                 <div className="px-4 py-1.5 rounded-full bg-gray-950/80 backdrop-blur-sm border border-white/10 text-sm text-gray-300 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="font-medium text-white">Demo Classroom</span>
-                    <span className="text-gray-500">• 9 online</span>
+                    <span className="font-medium text-white">{roomInfo.name}</span>
+                    <span className="text-gray-500">• {roomInfo.online} online</span>
                 </div>
             </motion.div>
 

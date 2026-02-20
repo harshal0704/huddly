@@ -5,20 +5,249 @@
 // Handles: tilemap rendering, avatar movement,
 // proximity detection, NPC simulation, interactive objects.
 
+import * as Phaser from "phaser";
 import EasyStar from "easystarjs";
 
-// Colors for NPC avatars
+// ─── Constants ───
+const TILE_SIZE = 32;
+const MAP_WIDTH = 40;
+const MAP_HEIGHT = 30;
+const PROXIMITY_RADIUS = 150;
+const MOVE_SPEED = 140;
+
+// ─── Avatar Colors ───
 const AVATAR_COLORS = [
     0x8b5cf6, 0x6366f1, 0x3b82f6, 0x06b6d4, 0x10b981,
     0xf59e0b, 0xef4444, 0xec4899, 0xa855f7, 0x14b8a6,
 ];
 
-const TILE_SIZE = 32;
-const MAP_WIDTH = 40;
-const MAP_HEIGHT = 30;
-const PROXIMITY_RADIUS = 150;
-const MOVE_SPEED = 120;
+// ─── Map Templates ───
+export type MapTemplate = "classroom" | "office" | "cafe" | "conference" | "party" | "blank";
 
+interface FurnitureItem {
+    x: number; y: number; w: number; h: number;
+    type: string; emoji: string; color: number; label?: string;
+}
+
+interface MapConfig {
+    name: string;
+    floorColor: number;
+    stageArea?: { x: number; y: number; w: number; h: number; color: number };
+    zones: { x: number; y: number; w: number; h: number; color: number; alpha: number }[];
+    furniture: FurnitureItem[];
+}
+
+const MAP_TEMPLATES: Record<MapTemplate, MapConfig> = {
+    classroom: {
+        name: "Classroom",
+        floorColor: 0x1a1025,
+        stageArea: { x: 10, y: 2, w: 20, h: 5, color: 0x2d1f4e },
+        zones: [
+            { x: 6, y: 7, w: 24, h: 12, color: 0x1e3a5f, alpha: 0.2 },
+            { x: 28, y: 20, w: 8, h: 6, color: 0x2a1f1f, alpha: 0.3 },
+            { x: 2, y: 20, w: 6, h: 6, color: 0x3d2b1f, alpha: 0.3 },
+        ],
+        furniture: [
+            // Desks - Row 1
+            { x: 8, y: 8, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 12, y: 8, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 16, y: 8, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 20, y: 8, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 24, y: 8, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            // Desks - Row 2
+            { x: 8, y: 12, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 12, y: 12, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 16, y: 12, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 20, y: 12, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 24, y: 12, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            // Desks - Row 3
+            { x: 8, y: 16, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 12, y: 16, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 16, y: 16, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 20, y: 16, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            { x: 24, y: 16, w: 2, h: 1, type: "desk", emoji: "", color: 0x3d3040 },
+            // Whiteboard
+            { x: 14, y: 3, w: 6, h: 1, type: "whiteboard", emoji: "📋", color: 0xffffff, label: "Whiteboard" },
+            // Podium
+            { x: 16, y: 5, w: 2, h: 1, type: "podium", emoji: "🎤", color: 0x8b4513 },
+            // Bookshelves
+            { x: 34, y: 5, w: 1, h: 8, type: "bookshelf", emoji: "📚", color: 0x5c3317 },
+            // Sofa
+            { x: 30, y: 22, w: 3, h: 2, type: "sofa", emoji: "🛋️", color: 0x8b5cf6 },
+            // Plants
+            { x: 2, y: 2, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 37, y: 2, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 2, y: 27, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 37, y: 27, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            // Coffee area
+            { x: 3, y: 22, w: 2, h: 2, type: "coffee", emoji: "☕", color: 0x4a2c2a },
+        ],
+    },
+    office: {
+        name: "Open Office",
+        floorColor: 0x0f1923,
+        zones: [
+            { x: 3, y: 3, w: 16, h: 12, color: 0x1a2a3a, alpha: 0.3 },
+            { x: 22, y: 3, w: 15, h: 12, color: 0x1a2a3a, alpha: 0.3 },
+            { x: 3, y: 18, w: 12, h: 8, color: 0x2a1a2a, alpha: 0.25 },
+            { x: 25, y: 18, w: 12, h: 8, color: 0x1a3a2a, alpha: 0.25 },
+        ],
+        furniture: [
+            // Team pods (L-shaped desks)
+            { x: 4, y: 4, w: 3, h: 1, type: "desk", emoji: "", color: 0x2a3a4a },
+            { x: 4, y: 6, w: 3, h: 1, type: "desk", emoji: "", color: 0x2a3a4a },
+            { x: 4, y: 8, w: 3, h: 1, type: "desk", emoji: "", color: 0x2a3a4a },
+            { x: 10, y: 4, w: 3, h: 1, type: "desk", emoji: "", color: 0x2a3a4a },
+            { x: 10, y: 6, w: 3, h: 1, type: "desk", emoji: "", color: 0x2a3a4a },
+            { x: 10, y: 8, w: 3, h: 1, type: "desk", emoji: "", color: 0x2a3a4a },
+            // Meeting room desks
+            { x: 24, y: 5, w: 5, h: 2, type: "table", emoji: "", color: 0x3a3040 },
+            { x: 24, y: 9, w: 5, h: 2, type: "table", emoji: "", color: 0x3a3040 },
+            // Monitor wall
+            { x: 23, y: 3, w: 1, h: 1, type: "monitor", emoji: "🖥️", color: 0x333333 },
+            { x: 31, y: 3, w: 1, h: 1, type: "monitor", emoji: "🖥️", color: 0x333333 },
+            // Whiteboard
+            { x: 35, y: 5, w: 1, h: 5, type: "whiteboard", emoji: "📋", color: 0xeeeeee, label: "Board" },
+            // Break area
+            { x: 4, y: 20, w: 3, h: 2, type: "sofa", emoji: "🛋️", color: 0x6366f1 },
+            { x: 9, y: 20, w: 2, h: 2, type: "coffee", emoji: "☕", color: 0x4a2c2a },
+            // Gaming corner
+            { x: 26, y: 20, w: 3, h: 2, type: "table", emoji: "🎮", color: 0x10b981 },
+            // Plants
+            { x: 2, y: 2, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 37, y: 2, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 2, y: 27, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 37, y: 27, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 20, y: 2, w: 1, h: 1, type: "plant", emoji: "🪴", color: 0x228b22 },
+            { x: 20, y: 27, w: 1, h: 1, type: "plant", emoji: "🪴", color: 0x228b22 },
+        ],
+    },
+    cafe: {
+        name: "Cozy Café",
+        floorColor: 0x1a150f,
+        zones: [
+            { x: 3, y: 3, w: 12, h: 10, color: 0x3d2b1f, alpha: 0.2 },
+            { x: 25, y: 3, w: 12, h: 10, color: 0x3d2b1f, alpha: 0.2 },
+            { x: 3, y: 18, w: 34, h: 8, color: 0x2a1f15, alpha: 0.15 },
+        ],
+        furniture: [
+            // Round tables
+            { x: 5, y: 5, w: 2, h: 2, type: "table", emoji: "☕", color: 0x5c3317 },
+            { x: 10, y: 5, w: 2, h: 2, type: "table", emoji: "☕", color: 0x5c3317 },
+            { x: 5, y: 9, w: 2, h: 2, type: "table", emoji: "🧁", color: 0x5c3317 },
+            { x: 10, y: 9, w: 2, h: 2, type: "table", emoji: "🍰", color: 0x5c3317 },
+            { x: 27, y: 5, w: 2, h: 2, type: "table", emoji: "☕", color: 0x5c3317 },
+            { x: 32, y: 5, w: 2, h: 2, type: "table", emoji: "☕", color: 0x5c3317 },
+            { x: 27, y: 9, w: 2, h: 2, type: "table", emoji: "🥐", color: 0x5c3317 },
+            { x: 32, y: 9, w: 2, h: 2, type: "table", emoji: "🍵", color: 0x5c3317 },
+            // Bar counter
+            { x: 16, y: 3, w: 6, h: 1, type: "counter", emoji: "", color: 0x4a3020, label: "☕ Counter" },
+            { x: 16, y: 5, w: 1, h: 1, type: "coffee", emoji: "☕", color: 0x2a1510 },
+            { x: 21, y: 5, w: 1, h: 1, type: "coffee", emoji: "🫖", color: 0x2a1510 },
+            // Cozy sofas bottom
+            { x: 4, y: 20, w: 4, h: 2, type: "sofa", emoji: "🛋️", color: 0xd97706 },
+            { x: 12, y: 20, w: 4, h: 2, type: "sofa", emoji: "🛋️", color: 0xd97706 },
+            { x: 24, y: 20, w: 4, h: 2, type: "sofa", emoji: "🛋️", color: 0xd97706 },
+            { x: 32, y: 20, w: 4, h: 2, type: "sofa", emoji: "🛋️", color: 0xd97706 },
+            // Stage / music corner
+            { x: 17, y: 22, w: 4, h: 3, type: "stage", emoji: "🎸", color: 0x2d1f4e },
+            // Plants
+            { x: 2, y: 2, w: 1, h: 1, type: "plant", emoji: "🌵", color: 0x228b22 },
+            { x: 37, y: 2, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+            { x: 2, y: 27, w: 1, h: 1, type: "plant", emoji: "🌻", color: 0x228b22 },
+            { x: 37, y: 27, w: 1, h: 1, type: "plant", emoji: "🌿", color: 0x228b22 },
+        ],
+    },
+    conference: {
+        name: "Conference Hall",
+        floorColor: 0x0d0d1a,
+        stageArea: { x: 8, y: 2, w: 24, h: 6, color: 0x1a1040 },
+        zones: [
+            { x: 4, y: 10, w: 32, h: 14, color: 0x15152a, alpha: 0.2 },
+        ],
+        furniture: [
+            // Main stage podium
+            { x: 18, y: 3, w: 4, h: 2, type: "podium", emoji: "🎤", color: 0x4a3870 },
+            // Stage screens
+            { x: 10, y: 2, w: 3, h: 2, type: "monitor", emoji: "🖥️", color: 0x333333 },
+            { x: 27, y: 2, w: 3, h: 2, type: "monitor", emoji: "🖥️", color: 0x333333 },
+            // Audience seats (rows)
+            { x: 6, y: 11, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 10, y: 11, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 14, y: 11, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 18, y: 11, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 22, y: 11, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 26, y: 11, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 30, y: 11, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 6, y: 14, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 10, y: 14, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 14, y: 14, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 18, y: 14, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 22, y: 14, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 26, y: 14, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 30, y: 14, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 6, y: 17, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 10, y: 17, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 14, y: 17, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 18, y: 17, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 22, y: 17, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 26, y: 17, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 30, y: 17, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 6, y: 20, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 10, y: 20, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 14, y: 20, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 18, y: 20, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 22, y: 20, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 26, y: 20, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            { x: 30, y: 20, w: 2, h: 1, type: "desk", emoji: "", color: 0x2a2040 },
+            // Side stands
+            { x: 3, y: 24, w: 2, h: 2, type: "counter", emoji: "🍿", color: 0x4a2c2a, label: "Snacks" },
+            { x: 35, y: 24, w: 2, h: 2, type: "counter", emoji: "☕", color: 0x4a2c2a, label: "Drinks" },
+        ],
+    },
+    party: {
+        name: "Party Island",
+        floorColor: 0x0a0a1e,
+        zones: [
+            { x: 12, y: 8, w: 16, h: 14, color: 0x2a1040, alpha: 0.25 },
+            { x: 3, y: 3, w: 6, h: 6, color: 0x1a3030, alpha: 0.3 },
+            { x: 31, y: 3, w: 6, h: 6, color: 0x301a30, alpha: 0.3 },
+        ],
+        furniture: [
+            // DJ booth
+            { x: 17, y: 3, w: 6, h: 2, type: "stage", emoji: "🎧", color: 0x6366f1 },
+            // Dance floor (open, no collision items)
+            // Bar area left
+            { x: 3, y: 4, w: 4, h: 1, type: "counter", emoji: "🍹", color: 0x4a2c2a, label: "Bar" },
+            { x: 3, y: 7, w: 2, h: 1, type: "sofa", emoji: "🛋️", color: 0xec4899 },
+            // VIP area right
+            { x: 32, y: 4, w: 4, h: 1, type: "counter", emoji: "🥂", color: 0xd97706, label: "VIP Bar" },
+            { x: 33, y: 7, w: 2, h: 1, type: "sofa", emoji: "🛋️", color: 0xa855f7 },
+            // Lounge tables scattered
+            { x: 6, y: 15, w: 2, h: 2, type: "table", emoji: "🍕", color: 0x3d3040 },
+            { x: 32, y: 15, w: 2, h: 2, type: "table", emoji: "🎂", color: 0x3d3040 },
+            { x: 6, y: 22, w: 2, h: 2, type: "table", emoji: "🍔", color: 0x3d3040 },
+            { x: 32, y: 22, w: 2, h: 2, type: "table", emoji: "🌮", color: 0x3d3040 },
+            // Photo booth
+            { x: 17, y: 24, w: 6, h: 2, type: "stage", emoji: "📸", color: 0xf59e0b },
+            // Plants / decorations
+            { x: 2, y: 2, w: 1, h: 1, type: "plant", emoji: "🎈", color: 0xef4444 },
+            { x: 37, y: 2, w: 1, h: 1, type: "plant", emoji: "🎈", color: 0x6366f1 },
+            { x: 2, y: 27, w: 1, h: 1, type: "plant", emoji: "🎈", color: 0x10b981 },
+            { x: 37, y: 27, w: 1, h: 1, type: "plant", emoji: "🎈", color: 0xf59e0b },
+            { x: 14, y: 14, w: 1, h: 1, type: "plant", emoji: "🪩", color: 0xd4d4d4 },
+            { x: 25, y: 14, w: 1, h: 1, type: "plant", emoji: "🪩", color: 0xd4d4d4 },
+        ],
+    },
+    blank: {
+        name: "Blank Canvas",
+        floorColor: 0x111118,
+        zones: [],
+        furniture: [],
+    },
+};
+
+// ─── NPC Config ───
 interface NPC {
     sprite: Phaser.GameObjects.Container;
     name: string;
@@ -31,31 +260,31 @@ interface NPC {
     isProximate: boolean;
 }
 
-// We export functions to be used as a Phaser scene config
-export function createRoomScene() {
+// ─── createRoomScene factory ───
+export function createRoomScene(template: MapTemplate = "classroom") {
+    const mapConfig = MAP_TEMPLATES[template] || MAP_TEMPLATES.classroom;
+
     let player: Phaser.GameObjects.Container;
-    let cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-    let wasdKeys: Record<string, Phaser.Input.Keyboard.Key>;
+    let cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+    let wasdKeys: Record<string, Phaser.Input.Keyboard.Key> | null = null;
     let npcs: NPC[] = [];
     let floorGraphics: Phaser.GameObjects.Graphics;
-    let furnitureGroup: Phaser.GameObjects.Group;
-    let easyStar: EasyStar.js;
+    let easyStar: InstanceType<typeof EasyStar.js>;
     let collisionGrid: number[][] = [];
-    let playerTargetX: number | null = null;
-    let playerTargetY: number | null = null;
     let pathLine: Phaser.GameObjects.Graphics;
     let isClickMoving = false;
     let emoteText: Phaser.GameObjects.Text | null = null;
     let statusIndicator: Phaser.GameObjects.Arc;
+    let playerIdleTween: Phaser.Tweens.Tween | null = null;
 
     function preload(this: Phaser.Scene) {
-        // No external assets needed — we draw everything procedurally
+        // All rendering is procedural — no external assets needed
     }
 
     function create(this: Phaser.Scene) {
         const scene = this;
 
-        // Initialize EasyStar pathfinding
+        // ─── EasyStar Pathfinding ───
         easyStar = new EasyStar.js();
 
         // Build collision grid (0 = walkable, 1 = blocked)
@@ -63,42 +292,13 @@ export function createRoomScene() {
         for (let y = 0; y < MAP_HEIGHT; y++) {
             const row: number[] = [];
             for (let x = 0; x < MAP_WIDTH; x++) {
-                // Border walls
-                if (x === 0 || y === 0 || x === MAP_WIDTH - 1 || y === MAP_HEIGHT - 1) {
-                    row.push(1);
-                } else {
-                    row.push(0);
-                }
+                row.push((x === 0 || y === 0 || x === MAP_WIDTH - 1 || y === MAP_HEIGHT - 1) ? 1 : 0);
             }
             collisionGrid.push(row);
         }
 
-        // Furniture collision areas (desks, whiteboard, etc.)
-        const furniturePositions = [
-            // Desks (classroom style rows)
-            { x: 8, y: 8, w: 2, h: 1 }, { x: 12, y: 8, w: 2, h: 1 }, { x: 16, y: 8, w: 2, h: 1 },
-            { x: 20, y: 8, w: 2, h: 1 }, { x: 24, y: 8, w: 2, h: 1 },
-            { x: 8, y: 12, w: 2, h: 1 }, { x: 12, y: 12, w: 2, h: 1 }, { x: 16, y: 12, w: 2, h: 1 },
-            { x: 20, y: 12, w: 2, h: 1 }, { x: 24, y: 12, w: 2, h: 1 },
-            { x: 8, y: 16, w: 2, h: 1 }, { x: 12, y: 16, w: 2, h: 1 }, { x: 16, y: 16, w: 2, h: 1 },
-            { x: 20, y: 16, w: 2, h: 1 }, { x: 24, y: 16, w: 2, h: 1 },
-            // Whiteboard at front
-            { x: 14, y: 3, w: 6, h: 1 },
-            // Podium
-            { x: 16, y: 5, w: 2, h: 1 },
-            // Bookshelves on right wall
-            { x: 34, y: 5, w: 1, h: 8 },
-            // Sofa area bottom-right
-            { x: 30, y: 22, w: 3, h: 2 },
-            // Plants
-            { x: 2, y: 2, w: 1, h: 1 }, { x: 37, y: 2, w: 1, h: 1 },
-            { x: 2, y: 27, w: 1, h: 1 }, { x: 37, y: 27, w: 1, h: 1 },
-            // Coffee area bottom-left
-            { x: 3, y: 22, w: 2, h: 2 },
-        ];
-
-        // Mark furniture in collision grid
-        furniturePositions.forEach((f) => {
+        // Mark furniture cells as blocked
+        mapConfig.furniture.forEach((f) => {
             for (let dy = 0; dy < f.h; dy++) {
                 for (let dx = 0; dx < f.w; dx++) {
                     const gx = f.x + dx;
@@ -115,62 +315,71 @@ export function createRoomScene() {
         easyStar.enableDiagonals();
         easyStar.enableCornerCutting();
 
-        // Draw floor
+        // ─── Draw Floor ───
         floorGraphics = scene.add.graphics();
-        drawFloor(floorGraphics);
+        drawFloor(floorGraphics, mapConfig);
 
-        // Draw furniture
-        furnitureGroup = scene.add.group();
-        drawFurniture(scene, furniturePositions);
+        // ─── Draw Furniture ───
+        drawFurniture(scene, mapConfig.furniture);
 
-        // Path line for click-to-move
+        // ─── Path Line ───
         pathLine = scene.add.graphics();
         pathLine.setDepth(5);
 
-        // Create player avatar
+        // ─── Player Avatar ───
         player = createAvatar(scene, 15 * TILE_SIZE, 20 * TILE_SIZE, "You", 0x8b5cf6, true);
         player.setDepth(10);
+
         scene.cameras.main.startFollow(player, true, 0.08, 0.08);
         scene.cameras.main.setZoom(1.2);
 
-        // Status indicator
+        // Status indicator (green dot)
         statusIndicator = scene.add.circle(0, 0, 4, 0x10b981);
         statusIndicator.setDepth(100);
 
-        // Create NPC avatars
-        const npcNames = ["Alex", "Maya", "Sam", "Jo", "Lee", "Kai", "Rui", "Zoe"];
-        for (let i = 0; i < 8; i++) {
+        // ─── NPCs ───
+        const npcData = [
+            { name: "Alex", skin: 0 }, { name: "Maya", skin: 1 },
+            { name: "Sam", skin: 2 }, { name: "Jo", skin: 3 },
+            { name: "Lee", skin: 4 }, { name: "Kai", skin: 5 },
+            { name: "Rui", skin: 6 }, { name: "Zoe", skin: 7 },
+        ];
+        for (const nd of npcData) {
             const nx = (5 + Math.floor(Math.random() * 30)) * TILE_SIZE;
             const ny = (5 + Math.floor(Math.random() * 20)) * TILE_SIZE;
-            const npcSprite = createAvatar(scene, nx, ny, npcNames[i], AVATAR_COLORS[i], false);
+            const npcSprite = createAvatar(scene, nx, ny, nd.name, AVATAR_COLORS[nd.skin], false);
             npcSprite.setDepth(9);
 
             npcs.push({
                 sprite: npcSprite,
-                name: npcNames[i],
+                name: nd.name,
                 targetX: nx,
                 targetY: ny,
                 moveTimer: Math.random() * 3000,
-                color: AVATAR_COLORS[i],
+                color: AVATAR_COLORS[nd.skin],
                 isProximate: false,
             });
         }
 
-        // Input: keyboard
+        // ─── Keyboard Input ───
         if (scene.input.keyboard) {
             cursors = scene.input.keyboard.createCursorKeys();
             wasdKeys = {
-                W: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-                A: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-                S: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-                D: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-                SPACE: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+                W: scene.input.keyboard.addKey("W"),
+                A: scene.input.keyboard.addKey("A"),
+                S: scene.input.keyboard.addKey("S"),
+                D: scene.input.keyboard.addKey("D"),
+                SPACE: scene.input.keyboard.addKey("SPACE"),
             };
+
+            // Prevent keyboard events from bubbling to the browser
+            scene.input.keyboard.disableGlobalCapture();
         }
 
-        // Input: click-to-move
+        // ─── Click-to-Move ───
         scene.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
             if (pointer.rightButtonDown()) return;
+
             const worldX = pointer.worldX;
             const worldY = pointer.worldY;
             const tileX = Math.floor(worldX / TILE_SIZE);
@@ -181,7 +390,6 @@ export function createRoomScene() {
             if (tileX >= 0 && tileX < MAP_WIDTH && tileY >= 0 && tileY < MAP_HEIGHT && collisionGrid[tileY][tileX] === 0) {
                 easyStar.findPath(playerTileX, playerTileY, tileX, tileY, (path) => {
                     if (path && path.length > 1) {
-                        // Draw path line
                         pathLine.clear();
                         pathLine.lineStyle(2, 0x8b5cf6, 0.3);
                         pathLine.moveTo(player.x, player.y);
@@ -189,8 +397,6 @@ export function createRoomScene() {
                             pathLine.lineTo(point.x * TILE_SIZE + TILE_SIZE / 2, point.y * TILE_SIZE + TILE_SIZE / 2);
                         }
                         pathLine.strokePath();
-
-                        // Move along path
                         moveAlongPath(scene, path);
                     }
                 });
@@ -198,16 +404,21 @@ export function createRoomScene() {
             }
         });
 
-        // Set world bounds
+        // ─── World bounds ───
         scene.physics.world.setBounds(0, 0, MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
         scene.cameras.main.setBounds(0, 0, MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
     }
 
     function moveAlongPath(scene: Phaser.Scene, path: { x: number; y: number }[]) {
+        // Kill the idle bob when moving via click
+        if (playerIdleTween) {
+            playerIdleTween.stop();
+            playerIdleTween = null;
+        }
         isClickMoving = true;
         pathLine.clear();
 
-        const tweenTargets: { x: number; y: number }[] = path.slice(1).map((p) => ({
+        const tweenTargets = path.slice(1).map((p) => ({
             x: p.x * TILE_SIZE + TILE_SIZE / 2,
             y: p.y * TILE_SIZE + TILE_SIZE / 2,
         }));
@@ -239,25 +450,39 @@ export function createRoomScene() {
 
     function update(this: Phaser.Scene, time: number, delta: number) {
         const scene = this;
-        if (!player || !cursors) return;
+        if (!player) return;
 
-        // Keyboard movement (WASD + arrows)
+        // ─── Keyboard Movement ───
         let vx = 0;
         let vy = 0;
 
-        if (cursors.left?.isDown || wasdKeys?.A?.isDown) vx = -MOVE_SPEED;
-        if (cursors.right?.isDown || wasdKeys?.D?.isDown) vx = MOVE_SPEED;
-        if (cursors.up?.isDown || wasdKeys?.W?.isDown) vy = -MOVE_SPEED;
-        if (cursors.down?.isDown || wasdKeys?.S?.isDown) vy = MOVE_SPEED;
+        const left = cursors?.left?.isDown || wasdKeys?.A?.isDown;
+        const right = cursors?.right?.isDown || wasdKeys?.D?.isDown;
+        const up = cursors?.up?.isDown || wasdKeys?.W?.isDown;
+        const down = cursors?.down?.isDown || wasdKeys?.S?.isDown;
 
+        if (left) vx = -MOVE_SPEED;
+        if (right) vx = MOVE_SPEED;
+        if (up) vy = -MOVE_SPEED;
+        if (down) vy = MOVE_SPEED;
+
+        // If pressing keys, cancel path movement
         if (vx !== 0 || vy !== 0) {
-            isClickMoving = false;
-            scene.tweens.killAll();
-            pathLine.clear();
+            if (isClickMoving) {
+                isClickMoving = false;
+                scene.tweens.killTweensOf(player);
+                pathLine.clear();
+            }
+
+            // Kill idle bob so it doesn't fight the movement
+            if (playerIdleTween) {
+                playerIdleTween.stop();
+                playerIdleTween = null;
+            }
         }
 
         if (!isClickMoving) {
-            // Normalize diagonal movement
+            // Normalize diagonal
             if (vx !== 0 && vy !== 0) {
                 vx *= 0.707;
                 vy *= 0.707;
@@ -266,49 +491,48 @@ export function createRoomScene() {
             const newX = player.x + vx * (delta / 1000);
             const newY = player.y + vy * (delta / 1000);
 
-            // Collision check
-            const tileX = Math.floor(newX / TILE_SIZE);
-            const tileY = Math.floor(newY / TILE_SIZE);
+            // Separate X and Y collision checks so player slides along walls
+            const ntx = Math.floor(newX / TILE_SIZE);
+            const nty = Math.floor(newY / TILE_SIZE);
+            const ctx = Math.floor(player.x / TILE_SIZE);
+            const cty = Math.floor(player.y / TILE_SIZE);
 
-            if (tileX >= 0 && tileX < MAP_WIDTH && tileY >= 0 && tileY < MAP_HEIGHT) {
-                if (collisionGrid[tileY]?.[Math.floor(newX / TILE_SIZE)] === 0) {
-                    player.x = newX;
-                }
-                if (collisionGrid[Math.floor(newY / TILE_SIZE)]?.[Math.floor(player.x / TILE_SIZE)] === 0) {
-                    player.y = newY;
-                }
+            if (ntx >= 0 && ntx < MAP_WIDTH && cty >= 0 && cty < MAP_HEIGHT && collisionGrid[cty][ntx] === 0) {
+                player.x = newX;
+            }
+            if (ctx >= 0 && ctx < MAP_WIDTH && nty >= 0 && nty < MAP_HEIGHT && collisionGrid[nty][ctx] === 0) {
+                player.y = newY;
             }
         }
 
-        // Update status indicator position
+        // ─── Status indicator ───
         if (statusIndicator) {
             statusIndicator.setPosition(player.x + 12, player.y - 22);
         }
 
-        // Emote text follow
+        // ─── Emote text follow ───
         if (emoteText) {
-            emoteText.setPosition(player.x, player.y - 40);
+            emoteText.x = player.x;
         }
 
-        // Space key for quick emote
-        if (wasdKeys?.SPACE?.isDown && !emoteText) {
-            showEmote(scene, ["👋", "💬", "🎉", "❤️", "😂", "🔥"][Math.floor(Math.random() * 6)]);
+        // ─── Space → random emote ───
+        if (Phaser.Input.Keyboard.JustDown(wasdKeys?.SPACE as Phaser.Input.Keyboard.Key) && !emoteText) {
+            const emojis = ["👋", "💬", "🎉", "❤️", "😂", "🔥", "👍", "✨"];
+            showEmote(scene, emojis[Math.floor(Math.random() * emojis.length)]);
         }
 
-        // Move NPCs
+        // ─── NPC logic ───
         for (const npc of npcs) {
             npc.moveTimer -= delta;
             if (npc.moveTimer <= 0) {
-                // Pick a new random target
                 const nx = (3 + Math.floor(Math.random() * 34)) * TILE_SIZE;
                 const ny = (3 + Math.floor(Math.random() * 24)) * TILE_SIZE;
-                const targetTileX = Math.floor(nx / TILE_SIZE);
-                const targetTileY = Math.floor(ny / TILE_SIZE);
+                const tx = Math.floor(nx / TILE_SIZE);
+                const ty = Math.floor(ny / TILE_SIZE);
 
-                if (collisionGrid[targetTileY]?.[targetTileX] === 0) {
+                if (collisionGrid[ty]?.[tx] === 0) {
                     npc.targetX = nx;
                     npc.targetY = ny;
-
                     scene.tweens.add({
                         targets: npc.sprite,
                         x: npc.targetX,
@@ -321,10 +545,7 @@ export function createRoomScene() {
             }
 
             // Proximity detection
-            const dist = Phaser.Math.Distance.Between(
-                player.x, player.y,
-                npc.sprite.x, npc.sprite.y
-            );
+            const dist = Phaser.Math.Distance.Between(player.x, player.y, npc.sprite.x, npc.sprite.y);
 
             if (dist < PROXIMITY_RADIUS && !npc.isProximate) {
                 npc.isProximate = true;
@@ -336,23 +557,14 @@ export function createRoomScene() {
                 hideVideoBubble(npc);
             }
 
-            // Update proximity ring position
-            if (npc.proximityRing) {
-                npc.proximityRing.setPosition(npc.sprite.x, npc.sprite.y);
-            }
-
-            // Update video bubble position
-            if (npc.videoBubble) {
-                npc.videoBubble.setPosition(npc.sprite.x, npc.sprite.y - 45);
-            }
+            if (npc.proximityRing) npc.proximityRing.setPosition(npc.sprite.x, npc.sprite.y);
+            if (npc.videoBubble) npc.videoBubble.setPosition(npc.sprite.x, npc.sprite.y - 45);
         }
     }
 
+    // ─── Helper: show emote ───
     function showEmote(scene: Phaser.Scene, emoji: string) {
-        emoteText = scene.add.text(player.x, player.y - 40, emoji, {
-            fontSize: "24px",
-        }).setOrigin(0.5).setDepth(100);
-
+        emoteText = scene.add.text(player.x, player.y - 40, emoji, { fontSize: "24px" }).setOrigin(0.5).setDepth(100);
         scene.tweens.add({
             targets: emoteText,
             y: player.y - 80,
@@ -366,32 +578,22 @@ export function createRoomScene() {
         });
     }
 
+    // ─── Helper: proximity ring ───
     function showProximityRing(scene: Phaser.Scene, npc: NPC) {
-        npc.proximityRing = scene.add.circle(
-            npc.sprite.x, npc.sprite.y,
-            PROXIMITY_RADIUS, npc.color, 0.08
-        );
+        npc.proximityRing = scene.add.circle(npc.sprite.x, npc.sprite.y, PROXIMITY_RADIUS, npc.color, 0.08);
         npc.proximityRing.setStrokeStyle(1.5, npc.color, 0.3);
         npc.proximityRing.setDepth(1);
-
-        scene.tweens.add({
-            targets: npc.proximityRing,
-            alpha: { from: 0, to: 1 },
-            duration: 300,
-        });
+        scene.tweens.add({ targets: npc.proximityRing, alpha: { from: 0, to: 1 }, duration: 300 });
     }
 
     function hideProximityRing(npc: NPC) {
-        if (npc.proximityRing) {
-            npc.proximityRing.destroy();
-            npc.proximityRing = undefined;
-        }
+        npc.proximityRing?.destroy();
+        npc.proximityRing = undefined;
     }
 
+    // ─── Helper: video bubble ───
     function showVideoBubble(scene: Phaser.Scene, npc: NPC) {
         const bubble = scene.add.container(npc.sprite.x, npc.sprite.y - 45);
-
-        // Background
         const bg = scene.add.graphics();
         bg.fillStyle(0x1e1b2e, 0.9);
         bg.fillRoundedRect(-20, -16, 40, 32, 8);
@@ -399,17 +601,14 @@ export function createRoomScene() {
         bg.strokeRoundedRect(-20, -16, 40, 32, 8);
         bubble.add(bg);
 
-        // Fake video avatar icon
         const icon = scene.add.text(0, 0, "🎥", { fontSize: "14px" }).setOrigin(0.5);
         bubble.add(icon);
-
         bubble.setDepth(50);
         bubble.setScale(0);
 
         scene.tweens.add({
             targets: bubble,
-            scaleX: 1,
-            scaleY: 1,
+            scaleX: 1, scaleY: 1,
             duration: 300,
             ease: "Back.easeOut",
         });
@@ -418,12 +617,11 @@ export function createRoomScene() {
     }
 
     function hideVideoBubble(npc: NPC) {
-        if (npc.videoBubble) {
-            npc.videoBubble.destroy();
-            npc.videoBubble = undefined;
-        }
+        npc.videoBubble?.destroy();
+        npc.videoBubble = undefined;
     }
 
+    // ─── Helper: create avatar ───
     function createAvatar(
         scene: Phaser.Scene,
         x: number, y: number,
@@ -442,62 +640,52 @@ export function createRoomScene() {
         body.fillRoundedRect(-10, -8, 20, 22, 4);
         container.add(body);
 
-        // Head
+        // Head (skin color)
         const head = scene.add.graphics();
         head.fillStyle(0xfdbcb4, 1);
         head.fillCircle(0, -14, 8);
         container.add(head);
 
         // Eyes
-        const leftEye = scene.add.circle(-3, -15, 1.5, 0x2d2d2d);
-        const rightEye = scene.add.circle(3, -15, 1.5, 0x2d2d2d);
-        container.add(leftEye);
-        container.add(rightEye);
+        container.add(scene.add.circle(-3, -15, 1.5, 0x2d2d2d));
+        container.add(scene.add.circle(3, -15, 1.5, 0x2d2d2d));
 
         // Hair
         const hair = scene.add.graphics();
-        hair.fillStyle(Phaser.Display.Color.IntegerToColor(color).darken(30).color, 1);
+        const hColor = Phaser.Display.Color.IntegerToColor(color).darken(30).color;
+        hair.fillStyle(hColor, 1);
         hair.fillRoundedRect(-8, -22, 16, 6, 3);
         container.add(hair);
 
-        // Name tag
-        const nameTag = scene.add.text(0, 16, name, {
+        // Nametag
+        const tag = scene.add.text(0, 16, name, {
             fontSize: "10px",
             fontFamily: "Inter, sans-serif",
             color: "#ffffff",
             backgroundColor: "rgba(0,0,0,0.5)",
             padding: { x: 4, y: 1 },
-        }).setOrigin(0.5);
-        nameTag.setResolution(2);
-        container.add(nameTag);
+        }).setOrigin(0.5).setResolution(2);
+        container.add(tag);
 
-        // Player glow
+        // Player glow ring
         if (isPlayer) {
             const glow = scene.add.circle(0, 0, 16, color, 0.15);
             container.add(glow);
             container.sendToBack(glow);
-
-            // Idle float animation
-            scene.tweens.add({
-                targets: container,
-                y: y - 2,
-                duration: 1500,
-                yoyo: true,
-                repeat: -1,
-                ease: "Sine.easeInOut",
-            });
+            // NOTE: no idle float tween here — it conflicts with keyboard movement
         }
 
         return container;
     }
 
-    function drawFloor(graphics: Phaser.GameObjects.Graphics) {
-        // Main floor - warm dark wood tint
-        graphics.fillStyle(0x1a1025, 1);
+    // ─── Helper: draw floor ───
+    function drawFloor(graphics: Phaser.GameObjects.Graphics, cfg: MapConfig) {
+        // Base floor
+        graphics.fillStyle(cfg.floorColor, 1);
         graphics.fillRect(0, 0, MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
 
         // Grid lines
-        graphics.lineStyle(0.5, 0x2d2640, 0.5);
+        graphics.lineStyle(0.5, 0x2d2640, 0.4);
         for (let x = 0; x <= MAP_WIDTH; x++) {
             graphics.moveTo(x * TILE_SIZE, 0);
             graphics.lineTo(x * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
@@ -508,92 +696,112 @@ export function createRoomScene() {
         }
         graphics.strokePath();
 
-        // Stage area (lighter)
-        graphics.fillStyle(0x2d1f4e, 0.5);
-        graphics.fillRect(10 * TILE_SIZE, 2 * TILE_SIZE, 20 * TILE_SIZE, 5 * TILE_SIZE);
+        // Stage area
+        if (cfg.stageArea) {
+            const s = cfg.stageArea;
+            graphics.fillStyle(s.color, 0.5);
+            graphics.fillRect(s.x * TILE_SIZE, s.y * TILE_SIZE, s.w * TILE_SIZE, s.h * TILE_SIZE);
+        }
 
-        // Carpet area
-        graphics.fillStyle(0x1e3a5f, 0.2);
-        graphics.fillRect(6 * TILE_SIZE, 7 * TILE_SIZE, 24 * TILE_SIZE, 12 * TILE_SIZE);
+        // Zones (carpet, lounge, etc.)
+        for (const z of cfg.zones) {
+            graphics.fillStyle(z.color, z.alpha);
+            graphics.fillRect(z.x * TILE_SIZE, z.y * TILE_SIZE, z.w * TILE_SIZE, z.h * TILE_SIZE);
+        }
 
-        // Lounge area
-        graphics.fillStyle(0x2a1f1f, 0.3);
-        graphics.fillRect(28 * TILE_SIZE, 20 * TILE_SIZE, 8 * TILE_SIZE, 6 * TILE_SIZE);
-
-        // Coffee corner
-        graphics.fillStyle(0x3d2b1f, 0.3);
-        graphics.fillRect(2 * TILE_SIZE, 20 * TILE_SIZE, 6 * TILE_SIZE, 6 * TILE_SIZE);
-
-        // Wall outlines
+        // Wall outline
         graphics.lineStyle(3, 0x4a3870, 0.8);
         graphics.strokeRect(0, 0, MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
     }
 
-    function drawFurniture(scene: Phaser.Scene, positions: { x: number; y: number; w: number; h: number }[]) {
-        positions.forEach((f, i) => {
+    // ─── Helper: draw furniture ───
+    function drawFurniture(scene: Phaser.Scene, items: FurnitureItem[]) {
+        for (const f of items) {
             const g = scene.add.graphics();
             g.setDepth(2);
+            const px = f.x * TILE_SIZE;
+            const py = f.y * TILE_SIZE;
+            const pw = f.w * TILE_SIZE;
+            const ph = f.h * TILE_SIZE;
 
-            // Determine furniture type by position
-            if (f.y === 3 && f.x === 14) {
-                // Whiteboard
-                g.fillStyle(0xffffff, 0.9);
-                g.fillRoundedRect(f.x * TILE_SIZE, f.y * TILE_SIZE, f.w * TILE_SIZE, f.h * TILE_SIZE, 4);
-                g.lineStyle(2, 0x666666, 1);
-                g.strokeRoundedRect(f.x * TILE_SIZE, f.y * TILE_SIZE, f.w * TILE_SIZE, f.h * TILE_SIZE, 4);
-
-                const label = scene.add.text(
-                    f.x * TILE_SIZE + (f.w * TILE_SIZE) / 2, f.y * TILE_SIZE + (f.h * TILE_SIZE) / 2,
-                    "📋 Whiteboard", { fontSize: "8px", color: "#333333" }
-                ).setOrigin(0.5).setDepth(3);
-            } else if (f.y === 5 && f.x === 16) {
-                // Podium
-                g.fillStyle(0x8b4513, 0.8);
-                g.fillRoundedRect(f.x * TILE_SIZE, f.y * TILE_SIZE, f.w * TILE_SIZE, f.h * TILE_SIZE, 4);
-                const label = scene.add.text(
-                    f.x * TILE_SIZE + (f.w * TILE_SIZE) / 2, f.y * TILE_SIZE + (f.h * TILE_SIZE) / 2,
-                    "🎤", { fontSize: "12px" }
-                ).setOrigin(0.5).setDepth(3);
-            } else if (f.w === 1 && f.h === 1 && i >= positions.length - 6) {
-                // Plants
-                g.fillStyle(0x228b22, 0.6);
-                g.fillCircle(f.x * TILE_SIZE + 16, f.y * TILE_SIZE + 16, 12);
-                const label = scene.add.text(
-                    f.x * TILE_SIZE + 16, f.y * TILE_SIZE + 16,
-                    "🌿", { fontSize: "12px" }
-                ).setOrigin(0.5).setDepth(3);
-            } else if (f.x === 34) {
-                // Bookshelf
-                g.fillStyle(0x5c3317, 0.7);
-                g.fillRoundedRect(f.x * TILE_SIZE, f.y * TILE_SIZE, f.w * TILE_SIZE, f.h * TILE_SIZE, 2);
-                const label = scene.add.text(
-                    f.x * TILE_SIZE + (f.w * TILE_SIZE) / 2, f.y * TILE_SIZE + (f.h * TILE_SIZE) / 2,
-                    "📚", { fontSize: "10px" }
-                ).setOrigin(0.5).setDepth(3);
-            } else if (f.x === 30 && f.y === 22) {
-                // Sofa
-                g.fillStyle(0x8b5cf6, 0.4);
-                g.fillRoundedRect(f.x * TILE_SIZE, f.y * TILE_SIZE, f.w * TILE_SIZE, f.h * TILE_SIZE, 6);
-                const label = scene.add.text(
-                    f.x * TILE_SIZE + (f.w * TILE_SIZE) / 2, f.y * TILE_SIZE + (f.h * TILE_SIZE) / 2,
-                    "🛋️", { fontSize: "14px" }
-                ).setOrigin(0.5).setDepth(3);
-            } else if (f.x === 3 && f.y === 22) {
-                // Coffee machine
-                g.fillStyle(0x4a2c2a, 0.6);
-                g.fillRoundedRect(f.x * TILE_SIZE, f.y * TILE_SIZE, f.w * TILE_SIZE, f.h * TILE_SIZE, 4);
-                const label = scene.add.text(
-                    f.x * TILE_SIZE + (f.w * TILE_SIZE) / 2, f.y * TILE_SIZE + (f.h * TILE_SIZE) / 2,
-                    "☕", { fontSize: "12px" }
-                ).setOrigin(0.5).setDepth(3);
-            } else {
-                // Regular desks
-                g.fillStyle(0x3d3040, 0.6);
-                g.fillRoundedRect(f.x * TILE_SIZE + 2, f.y * TILE_SIZE + 2, f.w * TILE_SIZE - 4, f.h * TILE_SIZE - 4, 3);
-                g.lineStyle(1, 0x5a4d6d, 0.4);
-                g.strokeRoundedRect(f.x * TILE_SIZE + 2, f.y * TILE_SIZE + 2, f.w * TILE_SIZE - 4, f.h * TILE_SIZE - 4, 3);
+            switch (f.type) {
+                case "whiteboard":
+                    g.fillStyle(0xffffff, 0.9);
+                    g.fillRoundedRect(px, py, pw, ph, 4);
+                    g.lineStyle(2, 0x666666, 1);
+                    g.strokeRoundedRect(px, py, pw, ph, 4);
+                    if (f.label) {
+                        scene.add.text(px + pw / 2, py + ph / 2, `${f.emoji} ${f.label}`, {
+                            fontSize: "8px", color: "#333",
+                        }).setOrigin(0.5).setDepth(3);
+                    }
+                    break;
+                case "podium":
+                    g.fillStyle(f.color, 0.8);
+                    g.fillRoundedRect(px, py, pw, ph, 4);
+                    scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "12px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                case "plant":
+                    g.fillStyle(f.color, 0.6);
+                    g.fillCircle(px + 16, py + 16, 12);
+                    scene.add.text(px + 16, py + 16, f.emoji, { fontSize: "12px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                case "bookshelf":
+                    g.fillStyle(f.color, 0.7);
+                    g.fillRoundedRect(px, py, pw, ph, 2);
+                    scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "10px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                case "sofa":
+                    g.fillStyle(f.color, 0.4);
+                    g.fillRoundedRect(px, py, pw, ph, 6);
+                    scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "14px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                case "coffee":
+                    g.fillStyle(f.color, 0.6);
+                    g.fillRoundedRect(px, py, pw, ph, 4);
+                    scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "12px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                case "monitor":
+                    g.fillStyle(f.color, 0.8);
+                    g.fillRoundedRect(px, py, pw, ph, 3);
+                    scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "12px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                case "counter":
+                    g.fillStyle(f.color, 0.7);
+                    g.fillRoundedRect(px, py, pw, ph, 4);
+                    g.lineStyle(1, 0x888888, 0.3);
+                    g.strokeRoundedRect(px, py, pw, ph, 4);
+                    if (f.label) {
+                        scene.add.text(px + pw / 2, py + ph / 2, `${f.emoji} ${f.label}`, {
+                            fontSize: "8px", color: "#ccc",
+                        }).setOrigin(0.5).setDepth(3);
+                    } else {
+                        scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "12px" }).setOrigin(0.5).setDepth(3);
+                    }
+                    break;
+                case "stage":
+                    g.fillStyle(f.color, 0.35);
+                    g.fillRoundedRect(px, py, pw, ph, 6);
+                    g.lineStyle(1.5, f.color, 0.5);
+                    g.strokeRoundedRect(px, py, pw, ph, 6);
+                    scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "16px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                case "table":
+                    g.fillStyle(f.color, 0.5);
+                    g.fillRoundedRect(px + 2, py + 2, pw - 4, ph - 4, 4);
+                    g.lineStyle(1, 0x5a4d6d, 0.3);
+                    g.strokeRoundedRect(px + 2, py + 2, pw - 4, ph - 4, 4);
+                    if (f.emoji) scene.add.text(px + pw / 2, py + ph / 2, f.emoji, { fontSize: "12px" }).setOrigin(0.5).setDepth(3);
+                    break;
+                default:
+                    // Desk or generic
+                    g.fillStyle(f.color, 0.6);
+                    g.fillRoundedRect(px + 2, py + 2, pw - 4, ph - 4, 3);
+                    g.lineStyle(1, 0x5a4d6d, 0.4);
+                    g.strokeRoundedRect(px + 2, py + 2, pw - 4, ph - 4, 3);
+                    break;
             }
-        });
+        }
     }
 
     return { key: "RoomScene", preload, create, update };
