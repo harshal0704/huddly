@@ -6,25 +6,18 @@ const FOOTER_LINKS = {
     Product: [
         { name: "Features", href: "#features" },
         { name: "Templates", href: "#templates" },
-        { name: "Pricing", href: "#pricing" },
         { name: "Demo", href: "/room/demo" },
     ],
-    Company: [
-        { name: "About", href: "#" },
-        { name: "Blog", href: "#" },
-        { name: "Careers", href: "#" },
-        { name: "Contact", href: "#" },
-    ],
     Resources: [
-        { name: "Documentation", href: "#" },
-        { name: "API Reference", href: "#" },
-        { name: "Status", href: "#" },
-        { name: "Changelog", href: "#" },
+        { name: "Documentation", href: "/docs" },
+        { name: "API Reference", href: "/api-reference" },
+        { name: "Status", href: "/status" },
+        { name: "Changelog", href: "/changelog" },
     ],
     Legal: [
-        { name: "Privacy", href: "#" },
-        { name: "Terms", href: "#" },
-        { name: "Security", href: "#" },
+        { name: "Privacy", href: "/privacy" },
+        { name: "Terms", href: "/terms" },
+        { name: "Security", href: "/security" },
     ],
 };
 
@@ -42,7 +35,7 @@ export default function Footer() {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Top section */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
                     {/* Brand */}
                     <div className="col-span-2 md:col-span-1">
                         <Link href="/" className="flex items-center gap-2 mb-4">

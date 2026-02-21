@@ -10,6 +10,10 @@ import EmoteWheel from "@/components/room/EmoteWheel";
 import ParticipantsList from "@/components/room/ParticipantsList";
 import Minimap from "@/components/room/Minimap";
 import RoomToolbar from "@/components/room/RoomToolbar";
+import VideoCallPanel from "@/components/room/VideoCallPanel";
+import WhiteboardPanel from "@/components/room/WhiteboardPanel";
+import BroadcastPanel from "@/components/room/BroadcastPanel";
+import { useMediaStream } from "@/hooks/useMediaStream";
 
 // Demo room metadata
 const DEMO_ROOMS: Record<string, { name: string; template: MapTemplate; online: number }> = {
@@ -28,16 +32,29 @@ export default function RoomPage({ params }: RoomPageProps) {
     const { id } = use(params);
     const roomInfo = DEMO_ROOMS[id] || DEMO_ROOMS.demo;
 
-    const [isMuted, setIsMuted] = useState(false);
-    const [isCameraOff, setIsCameraOff] = useState(false);
+    // Real media streams
+    const media = useMediaStream();
+
+    // UI panel states
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isMinimapOpen, setIsMinimapOpen] = useState(true);
     const [isEmoteOpen, setIsEmoteOpen] = useState(false);
+    const [isVideoCallOpen, setIsVideoCallOpen] = useState(true);
+    const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+    const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
     const handleEmoteSelect = useCallback((emoji: string) => {
         console.log("Emote selected:", emoji);
     }, []);
+
+    const handleScreenShare = useCallback(() => {
+        if (media.isScreenSharing) {
+            media.stopScreenShare();
+        } else {
+            media.startScreenShare();
+        }
+    }, [media]);
 
     const sceneConfig = createRoomScene(roomInfo.template);
 
@@ -55,6 +72,17 @@ export default function RoomPage({ params }: RoomPageProps) {
                     <span className="text-gray-500">• {roomInfo.online} online</span>
                 </div>
             </motion.div>
+
+            {/* Media error banner */}
+            {media.error && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-red-600/90 backdrop-blur-sm text-white text-xs font-medium max-w-sm text-center"
+                >
+                    {media.error}
+                </motion.div>
+            )}
 
             {/* Keyboard shortcuts hint */}
             <motion.div
@@ -84,7 +112,7 @@ export default function RoomPage({ params }: RoomPageProps) {
                 <PhaserGame sceneConfig={sceneConfig} className="w-full h-full" />
             </div>
 
-            {/* Overlay UI */}
+            {/* Overlay UI — all panels can be open simultaneously */}
             <ParticipantsList isOpen={isParticipantsOpen} onClose={() => setIsParticipantsOpen(false)} />
             <ChatSidebar isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
             <EmoteWheel isOpen={isEmoteOpen} onSelect={handleEmoteSelect} onClose={() => setIsEmoteOpen(false)} />
@@ -97,20 +125,59 @@ export default function RoomPage({ params }: RoomPageProps) {
                 npcs={[]}
             />
 
-            {/* Bottom toolbar */}
+            {/* Video Call Panel — shows real webcam */}
+            <VideoCallPanel
+                isOpen={isVideoCallOpen}
+                onClose={() => setIsVideoCallOpen(false)}
+                localStream={media.localStream}
+                screenStream={media.screenStream}
+                isMuted={media.isMuted}
+                isCameraOff={media.isCameraOff}
+                onStartMedia={media.startMedia}
+            />
+
+            {/* Whiteboard Panel */}
+            <WhiteboardPanel
+                isOpen={isWhiteboardOpen}
+                onClose={() => setIsWhiteboardOpen(false)}
+            />
+
+            {/* Broadcast Panel — shows real camera/screen */}
+            <BroadcastPanel
+                isOpen={isBroadcastOpen}
+                onClose={() => setIsBroadcastOpen(false)}
+                localStream={media.localStream}
+                screenStream={media.screenStream}
+                isMuted={media.isMuted}
+                isCameraOff={media.isCameraOff}
+                isScreenSharing={media.isScreenSharing}
+                onToggleMute={media.toggleMute}
+                onToggleCamera={media.toggleCamera}
+                onStartScreenShare={media.startScreenShare}
+                onStopScreenShare={media.stopScreenShare}
+                onStartMedia={media.startMedia}
+            />
+
+            {/* Bottom toolbar — controls real media tracks */}
             <RoomToolbar
-                isMuted={isMuted}
-                isCameraOff={isCameraOff}
+                isMuted={media.isMuted}
+                isCameraOff={media.isCameraOff}
                 isChatOpen={isChatOpen}
                 isParticipantsOpen={isParticipantsOpen}
                 isMinimapOpen={isMinimapOpen}
-                onToggleMute={() => setIsMuted(!isMuted)}
-                onToggleCamera={() => setIsCameraOff(!isCameraOff)}
+                isVideoCallOpen={isVideoCallOpen}
+                isWhiteboardOpen={isWhiteboardOpen}
+                isBroadcastOpen={isBroadcastOpen}
+                onToggleMute={media.toggleMute}
+                onToggleCamera={media.toggleCamera}
                 onToggleChat={() => setIsChatOpen(!isChatOpen)}
                 onToggleParticipants={() => setIsParticipantsOpen(!isParticipantsOpen)}
                 onToggleMinimap={() => setIsMinimapOpen(!isMinimapOpen)}
                 onToggleEmote={() => setIsEmoteOpen(!isEmoteOpen)}
-                onScreenShare={() => console.log("Screen share")}
+                onScreenShare={handleScreenShare}
+                onToggleVideoCall={() => setIsVideoCallOpen(!isVideoCallOpen)}
+                onToggleWhiteboard={() => setIsWhiteboardOpen(!isWhiteboardOpen)}
+                onToggleBroadcast={() => setIsBroadcastOpen(!isBroadcastOpen)}
             />
         </div>
     );

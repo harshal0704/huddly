@@ -3,7 +3,7 @@
 import React from "react";
 import {
     MessageCircle, Users, Map, Mic, MicOff, Video, VideoOff,
-    Monitor, Keyboard, Settings, LogOut, Smile
+    Monitor, LogOut, Smile, Pen, Radio
 } from "lucide-react";
 import Link from "next/link";
 
@@ -13,6 +13,9 @@ interface RoomToolbarProps {
     isChatOpen: boolean;
     isParticipantsOpen: boolean;
     isMinimapOpen: boolean;
+    isVideoCallOpen: boolean;
+    isWhiteboardOpen: boolean;
+    isBroadcastOpen: boolean;
 
     onToggleMute: () => void;
     onToggleCamera: () => void;
@@ -21,6 +24,9 @@ interface RoomToolbarProps {
     onToggleMinimap: () => void;
     onToggleEmote: () => void;
     onScreenShare: () => void;
+    onToggleVideoCall: () => void;
+    onToggleWhiteboard: () => void;
+    onToggleBroadcast: () => void;
 }
 
 export default function RoomToolbar({
@@ -29,6 +35,9 @@ export default function RoomToolbar({
     isChatOpen,
     isParticipantsOpen,
     isMinimapOpen,
+    isVideoCallOpen,
+    isWhiteboardOpen,
+    isBroadcastOpen,
     onToggleMute,
     onToggleCamera,
     onToggleChat,
@@ -36,6 +45,9 @@ export default function RoomToolbar({
     onToggleMinimap,
     onToggleEmote,
     onScreenShare,
+    onToggleVideoCall,
+    onToggleWhiteboard,
+    onToggleBroadcast,
 }: RoomToolbarProps) {
     return (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30">
@@ -63,6 +75,32 @@ export default function RoomToolbar({
                     icon={Monitor}
                     label="Screen Share"
                     onClick={onScreenShare}
+                />
+
+                <div className="w-px h-6 bg-white/10 mx-1" />
+
+                {/* Video Call Panel */}
+                <ToolbarButton
+                    icon={Video}
+                    label="Video Call"
+                    active={isVideoCallOpen}
+                    onClick={onToggleVideoCall}
+                />
+
+                {/* Whiteboard */}
+                <ToolbarButton
+                    icon={Pen}
+                    label="Whiteboard"
+                    active={isWhiteboardOpen}
+                    onClick={onToggleWhiteboard}
+                />
+
+                {/* Broadcast */}
+                <ToolbarButton
+                    icon={Radio}
+                    label="Broadcast"
+                    active={isBroadcastOpen}
+                    onClick={onToggleBroadcast}
                 />
 
                 <div className="w-px h-6 bg-white/10 mx-1" />
@@ -132,10 +170,10 @@ function ToolbarButton({
             onClick={onClick}
             title={label}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${danger
-                    ? "text-red-400 hover:bg-red-500/20"
-                    : active
-                        ? "text-violet-400 bg-violet-500/15"
-                        : "text-gray-400 hover:text-white hover:bg-white/10"
+                ? "text-red-400 hover:bg-red-500/20"
+                : active
+                    ? "text-violet-400 bg-violet-500/15"
+                    : "text-gray-400 hover:text-white hover:bg-white/10"
                 }`}
         >
             <Icon className="w-4.5 h-4.5" />

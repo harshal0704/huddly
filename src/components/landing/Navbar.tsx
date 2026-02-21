@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 const NAV_LINKS = [
     { name: "Features", href: "#features" },
     { name: "Templates", href: "#templates" },
-    { name: "Pricing", href: "#pricing" },
     { name: "How it Works", href: "#how-it-works" },
 ];
 
@@ -29,8 +28,8 @@ export default function Navbar() {
             animate={{ y: 0 }}
             transition={{ type: "spring", damping: 20, stiffness: 100 }}
             className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled
-                    ? "bg-gray-950/80 backdrop-blur-xl border-b border-white/10 shadow-2xl"
-                    : "bg-transparent"
+                ? "bg-gray-950/80 backdrop-blur-xl border-b border-white/10 shadow-2xl"
+                : "bg-transparent"
                 }`}
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
