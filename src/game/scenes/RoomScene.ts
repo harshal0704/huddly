@@ -13,7 +13,8 @@ const TILE_SIZE = 32;
 const MAP_WIDTH = 40;
 const MAP_HEIGHT = 30;
 const PROXIMITY_RADIUS = 150;
-const MOVE_SPEED = 140;
+const MOVE_SPEED = 160;
+const AMBIENT_PARTICLE_COUNT = 25;
 
 // ─── Avatar Colors ───
 const AVATAR_COLORS = [
@@ -266,7 +267,11 @@ export function createRoomScene(template: MapTemplate = "classroom") {
 
     let player: Phaser.GameObjects.Container;
     let cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
-    let wasdKeys: Record<string, Phaser.Input.Keyboard.Key> | null = null;
+    let keyW: Phaser.Input.Keyboard.Key | null = null;
+    let keyA: Phaser.Input.Keyboard.Key | null = null;
+    let keyS: Phaser.Input.Keyboard.Key | null = null;
+    let keyD: Phaser.Input.Keyboard.Key | null = null;
+    let keySpace: Phaser.Input.Keyboard.Key | null = null;
     let npcs: NPC[] = [];
     let floorGraphics: Phaser.GameObjects.Graphics;
     let easyStar: InstanceType<typeof EasyStar.js>;
@@ -276,6 +281,10 @@ export function createRoomScene(template: MapTemplate = "classroom") {
     let emoteText: Phaser.GameObjects.Text | null = null;
     let statusIndicator: Phaser.GameObjects.Arc;
     let playerIdleTween: Phaser.Tweens.Tween | null = null;
+    let ambientParticles: Phaser.GameObjects.Arc[] = [];
+    let walkBobOffset = 0;
+    let isWalking = false;
+    let interactHint: Phaser.GameObjects.Text | null = null;
 
     function preload(this: Phaser.Scene) {
         // All rendering is procedural — no external assets needed
@@ -333,6 +342,26 @@ export function createRoomScene(template: MapTemplate = "classroom") {
         scene.cameras.main.startFollow(player, true, 0.08, 0.08);
         scene.cameras.main.setZoom(1.2);
 
+        // ─── Ambient Floating Particles ───
+        for (let i = 0; i < AMBIENT_PARTICLE_COUNT; i++) {
+            const px = Math.random() * MAP_WIDTH * TILE_SIZE;
+            const py = Math.random() * MAP_HEIGHT * TILE_SIZE;
+            const size = 1 + Math.random() * 2;
+            const alpha = 0.1 + Math.random() * 0.2;
+            const dot = scene.add.circle(px, py, size, 0x8b5cf6, alpha);
+            dot.setDepth(0);
+            scene.tweens.add({
+                targets: dot,
+                y: py - 20 - Math.random() * 30,
+                alpha: 0,
+                duration: 4000 + Math.random() * 4000,
+                repeat: -1,
+                yoyo: true,
+                delay: Math.random() * 3000,
+            });
+            ambientParticles.push(dot);
+        }
+
         // Status indicator (green dot)
         statusIndicator = scene.add.circle(0, 0, 4, 0x10b981);
         statusIndicator.setDepth(100);
@@ -362,18 +391,26 @@ export function createRoomScene(template: MapTemplate = "classroom") {
         }
 
         // ─── Keyboard Input ───
+        // Use Phaser KeyCodes directly for reliable key capture (fixes D key)
         if (scene.input.keyboard) {
             cursors = scene.input.keyboard.createCursorKeys();
-            wasdKeys = {
-                W: scene.input.keyboard.addKey("W"),
-                A: scene.input.keyboard.addKey("A"),
-                S: scene.input.keyboard.addKey("S"),
-                D: scene.input.keyboard.addKey("D"),
-                SPACE: scene.input.keyboard.addKey("SPACE"),
-            };
+            keyW = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W, true, true);
+            keyA = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A, true, true);
+            keyS = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S, true, true);
+            keyD = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D, true, true);
+            keySpace = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, true, true);
 
-            // Prevent keyboard events from bubbling to the browser
-            scene.input.keyboard.disableGlobalCapture();
+            // Only capture game keys, let others pass through to UI
+            scene.input.keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.W,
+            Phaser.Input.Keyboard.KeyCodes.A,
+            Phaser.Input.Keyboard.KeyCodes.S,
+            Phaser.Input.Keyboard.KeyCodes.D,
+            Phaser.Input.Keyboard.KeyCodes.SPACE,
+            Phaser.Input.Keyboard.KeyCodes.UP,
+            Phaser.Input.Keyboard.KeyCodes.DOWN,
+            Phaser.Input.Keyboard.KeyCodes.LEFT,
+            Phaser.Input.Keyboard.KeyCodes.RIGHT,
+            ]);
         }
 
         // ─── Click-to-Move ───
@@ -456,10 +493,10 @@ export function createRoomScene(template: MapTemplate = "classroom") {
         let vx = 0;
         let vy = 0;
 
-        const left = cursors?.left?.isDown || wasdKeys?.A?.isDown;
-        const right = cursors?.right?.isDown || wasdKeys?.D?.isDown;
-        const up = cursors?.up?.isDown || wasdKeys?.W?.isDown;
-        const down = cursors?.down?.isDown || wasdKeys?.S?.isDown;
+        const left = cursors?.left?.isDown || keyA?.isDown;
+        const right = cursors?.right?.isDown || keyD?.isDown;
+        const up = cursors?.up?.isDown || keyW?.isDown;
+        const down = cursors?.down?.isDown || keyS?.isDown;
 
         if (left) vx = -MOVE_SPEED;
         if (right) vx = MOVE_SPEED;
@@ -473,12 +510,22 @@ export function createRoomScene(template: MapTemplate = "classroom") {
                 scene.tweens.killTweensOf(player);
                 pathLine.clear();
             }
-
-            // Kill idle bob so it doesn't fight the movement
             if (playerIdleTween) {
                 playerIdleTween.stop();
                 playerIdleTween = null;
             }
+        }
+
+        // Walking state and bob animation
+        const wasWalking = isWalking;
+        isWalking = (vx !== 0 || vy !== 0) || isClickMoving;
+        if (isWalking) {
+            walkBobOffset += delta * 0.012;
+            // Subtle bob while walking
+            const bobAmount = Math.sin(walkBobOffset) * 1.5;
+            player.setData('bobOffset', bobAmount);
+        } else {
+            walkBobOffset = 0;
         }
 
         if (!isClickMoving) {
@@ -515,9 +562,35 @@ export function createRoomScene(template: MapTemplate = "classroom") {
             emoteText.x = player.x;
         }
 
+        // ─── Interactive furniture hint ───
+        let nearFurniture = false;
+        for (const f of mapConfig.furniture) {
+            const fx = f.x * TILE_SIZE + (f.w * TILE_SIZE) / 2;
+            const fy = f.y * TILE_SIZE + (f.h * TILE_SIZE) / 2;
+            const dist = Phaser.Math.Distance.Between(player.x, player.y, fx, fy);
+            if (dist < TILE_SIZE * 2.5 && f.label) {
+                nearFurniture = true;
+                if (!interactHint) {
+                    interactHint = scene.add.text(fx, fy - 24, `${f.emoji || ''} ${f.label}`, {
+                        fontSize: '10px', fontFamily: 'Inter, sans-serif',
+                        color: '#c4b5fd', backgroundColor: 'rgba(30,20,50,0.85)',
+                        padding: { x: 6, y: 3 },
+                    }).setOrigin(0.5).setDepth(100);
+                } else {
+                    interactHint.setPosition(fx, fy - 24);
+                    interactHint.setText(`${f.emoji || ''} ${f.label}`);
+                }
+                break;
+            }
+        }
+        if (!nearFurniture && interactHint) {
+            interactHint.destroy();
+            interactHint = null;
+        }
+
         // ─── Space → random emote ───
-        if (Phaser.Input.Keyboard.JustDown(wasdKeys?.SPACE as Phaser.Input.Keyboard.Key) && !emoteText) {
-            const emojis = ["👋", "💬", "🎉", "❤️", "😂", "🔥", "👍", "✨"];
+        if (keySpace && Phaser.Input.Keyboard.JustDown(keySpace) && !emoteText) {
+            const emojis = ["👋", "💬", "🎉", "❤️", "😂", "🔥", "👍", "✨", "🙌", "💜", "🎵", "⚡"];
             showEmote(scene, emojis[Math.floor(Math.random() * emojis.length)]);
         }
 
@@ -559,6 +632,10 @@ export function createRoomScene(template: MapTemplate = "classroom") {
 
             if (npc.proximityRing) npc.proximityRing.setPosition(npc.sprite.x, npc.sprite.y);
             if (npc.videoBubble) npc.videoBubble.setPosition(npc.sprite.x, npc.sprite.y - 45);
+
+            // NPC idle breathing animation
+            const breathe = Math.sin(time * 0.002 + npcs.indexOf(npc) * 0.5) * 0.5;
+            npc.sprite.setScale(1, 1 + breathe * 0.02);
         }
     }
 
@@ -667,12 +744,22 @@ export function createRoomScene(template: MapTemplate = "classroom") {
         }).setOrigin(0.5).setResolution(2);
         container.add(tag);
 
-        // Player glow ring
+        // Player glow ring + pulse
         if (isPlayer) {
-            const glow = scene.add.circle(0, 0, 16, color, 0.15);
+            const glow = scene.add.circle(0, 0, 18, color, 0.12);
             container.add(glow);
             container.sendToBack(glow);
-            // NOTE: no idle float tween here — it conflicts with keyboard movement
+            // Subtle pulse on player glow
+            scene.tweens.add({
+                targets: glow,
+                scaleX: 1.3,
+                scaleY: 1.3,
+                alpha: 0.06,
+                duration: 2000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+            });
         }
 
         return container;
@@ -684,17 +771,13 @@ export function createRoomScene(template: MapTemplate = "classroom") {
         graphics.fillStyle(cfg.floorColor, 1);
         graphics.fillRect(0, 0, MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
 
-        // Grid lines
-        graphics.lineStyle(0.5, 0x2d2640, 0.4);
+        // Dot grid (cleaner than line grid)
+        graphics.fillStyle(0x2d2640, 0.5);
         for (let x = 0; x <= MAP_WIDTH; x++) {
-            graphics.moveTo(x * TILE_SIZE, 0);
-            graphics.lineTo(x * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
+            for (let y = 0; y <= MAP_HEIGHT; y++) {
+                graphics.fillCircle(x * TILE_SIZE, y * TILE_SIZE, 1);
+            }
         }
-        for (let y = 0; y <= MAP_HEIGHT; y++) {
-            graphics.moveTo(0, y * TILE_SIZE);
-            graphics.lineTo(MAP_WIDTH * TILE_SIZE, y * TILE_SIZE);
-        }
-        graphics.strokePath();
 
         // Stage area
         if (cfg.stageArea) {
