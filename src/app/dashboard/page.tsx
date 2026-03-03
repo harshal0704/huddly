@@ -25,6 +25,10 @@ const TEMPLATE_OPTIONS: { value: RoomTemplate; label: string; emoji: string }[] 
     { value: "cafe", label: "Café", emoji: "☕" },
     { value: "conference", label: "Conference", emoji: "🎤" },
     { value: "party", label: "Party Island", emoji: "🎉" },
+    { value: "library", label: "Library", emoji: "📖" },
+    { value: "gaming", label: "Gaming Lounge", emoji: "🎮" },
+    { value: "rooftop", label: "Rooftop Garden", emoji: "🌿" },
+    { value: "theater", label: "Theater", emoji: "🎬" },
     { value: "blank", label: "Blank Canvas", emoji: "🎨" },
 ];
 
@@ -152,8 +156,8 @@ export default function DashboardPage() {
                                                 key={t.value}
                                                 onClick={() => setNewTemplate(t.value)}
                                                 className={`p-3 rounded-xl border text-center transition-all ${newTemplate === t.value
-                                                        ? "border-violet-500 bg-violet-500/10 text-white"
-                                                        : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
+                                                    ? "border-violet-500 bg-violet-500/10 text-white"
+                                                    : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
                                                     }`}
                                             >
                                                 <span className="text-xl block mb-1">{t.emoji}</span>
@@ -169,8 +173,8 @@ export default function DashboardPage() {
                                             <button
                                                 onClick={() => setNewVisibility("public")}
                                                 className={`flex-1 p-2 rounded-lg border text-sm flex items-center justify-center gap-2 transition-all ${newVisibility === "public"
-                                                        ? "border-violet-500 bg-violet-500/10 text-white"
-                                                        : "border-white/10 text-gray-400"
+                                                    ? "border-violet-500 bg-violet-500/10 text-white"
+                                                    : "border-white/10 text-gray-400"
                                                     }`}
                                             >
                                                 <Globe className="w-3.5 h-3.5" />
@@ -179,8 +183,8 @@ export default function DashboardPage() {
                                             <button
                                                 onClick={() => setNewVisibility("private")}
                                                 className={`flex-1 p-2 rounded-lg border text-sm flex items-center justify-center gap-2 transition-all ${newVisibility === "private"
-                                                        ? "border-violet-500 bg-violet-500/10 text-white"
-                                                        : "border-white/10 text-gray-400"
+                                                    ? "border-violet-500 bg-violet-500/10 text-white"
+                                                    : "border-white/10 text-gray-400"
                                                     }`}
                                             >
                                                 <Lock className="w-3.5 h-3.5" />
@@ -232,10 +236,14 @@ export default function DashboardPage() {
                             {/* Thumbnail */}
                             <Link href={`/room/${room.id}`}>
                                 <div className={`h-36 bg-gradient-to-br ${room.template === "classroom" ? "from-blue-900/50 to-indigo-900/50" :
-                                        room.template === "office" ? "from-emerald-900/50 to-teal-900/50" :
-                                            room.template === "cafe" ? "from-amber-900/50 to-orange-900/50" :
-                                                room.template === "conference" ? "from-violet-900/50 to-purple-900/50" :
-                                                    "from-pink-900/50 to-rose-900/50"
+                                    room.template === "office" ? "from-emerald-900/50 to-teal-900/50" :
+                                        room.template === "cafe" ? "from-amber-900/50 to-orange-900/50" :
+                                            room.template === "conference" ? "from-violet-900/50 to-purple-900/50" :
+                                                room.template === "library" ? "from-yellow-900/50 to-amber-900/50" :
+                                                    room.template === "gaming" ? "from-cyan-900/50 to-blue-900/50" :
+                                                        room.template === "rooftop" ? "from-lime-900/50 to-green-900/50" :
+                                                            room.template === "theater" ? "from-red-900/50 to-rose-900/50" :
+                                                                "from-pink-900/50 to-rose-900/50"
                                     } relative`}>
                                     <div className="absolute inset-0 opacity-20"
                                         style={{
@@ -245,7 +253,7 @@ export default function DashboardPage() {
                                     />
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <span className="text-3xl opacity-40 group-hover:opacity-60 group-hover:scale-110 transition-all">
-                                            {room.template === "classroom" ? "📚" : room.template === "office" ? "🏢" : room.template === "cafe" ? "☕" : room.template === "conference" ? "🎤" : "🎉"}
+                                            {room.template === "classroom" ? "📚" : room.template === "office" ? "🏢" : room.template === "cafe" ? "☕" : room.template === "conference" ? "🎤" : room.template === "library" ? "📖" : room.template === "gaming" ? "🎮" : room.template === "rooftop" ? "🌿" : room.template === "theater" ? "🎬" : "🎉"}
                                         </span>
                                     </div>
                                     {/* Online badge */}

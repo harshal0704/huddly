@@ -1,122 +1,73 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { GraduationCap, Building2, Coffee, Mic2, PartyPopper } from "lucide-react";
+import {
+    GraduationCap, Building2, Coffee, Mic2, PartyPopper,
+    BookOpen, Gamepad2, Trees, Clapperboard
+} from "lucide-react";
 
 const TEMPLATES = [
-    {
-        name: "Classroom",
-        description: "Rows of desks, a podium stage, whiteboard, and cozy reading corner.",
-        icon: GraduationCap,
-        gradient: "from-blue-600 to-indigo-700",
-        accentColor: "text-blue-400",
-        objects: "25 desks • Podium • Whiteboard • Bookshelf",
-    },
-    {
-        name: "Modern Office",
-        description: "Open floor plan with huddle rooms, standing desks, and a kitchen area.",
-        icon: Building2,
-        gradient: "from-emerald-600 to-teal-700",
-        accentColor: "text-emerald-400",
-        objects: "40 desks • 4 Meeting Rooms • Kitchen • Lounge",
-    },
-    {
-        name: "Pixel Café",
-        description: "Cozy café vibes with coffee machines, sofas, and ambient jazz.",
-        icon: Coffee,
-        gradient: "from-amber-600 to-orange-700",
-        accentColor: "text-amber-400",
-        objects: "12 Tables • Sofas • Coffee Bar • Plants",
-    },
-    {
-        name: "Conference Hall",
-        description: "Big stage, audience seating, and breakout rooms for Q&A sessions.",
-        icon: Mic2,
-        gradient: "from-violet-600 to-purple-700",
-        accentColor: "text-violet-400",
-        objects: "100 Seats • Stage • 3 Breakout Rooms",
-    },
-    {
-        name: "Party Island",
-        description: "Tropical beach with fire pits, dance floor, arcade games, and DJ booth.",
-        icon: PartyPopper,
-        gradient: "from-pink-600 to-rose-700",
-        accentColor: "text-pink-400",
-        objects: "Dance Floor • Arcade • DJ Booth • Beach",
-    },
+    { name: "Classroom", description: "Desks, podium, whiteboard & broadcast screen.", icon: GraduationCap, gradient: "from-blue-600 to-indigo-700", accent: "text-blue-400", href: "/room/demo" },
+    { name: "Office", description: "Open plan with huddle rooms and lounge area.", icon: Building2, gradient: "from-emerald-600 to-teal-700", accent: "text-emerald-400", href: "/room/office" },
+    { name: "Café", description: "Cozy coffee bar, round tables, warm vibes.", icon: Coffee, gradient: "from-amber-600 to-orange-700", accent: "text-amber-400", href: "/room/cafe" },
+    { name: "Conference", description: "Big stage, tiered seating, triple screens.", icon: Mic2, gradient: "from-violet-600 to-purple-700", accent: "text-violet-400", href: "/room/conference" },
+    { name: "Party", description: "DJ booth, LED dance floor, neon everywhere.", icon: PartyPopper, gradient: "from-pink-600 to-rose-700", accent: "text-pink-400", href: "/room/party" },
+    { name: "Library", description: "Tall bookshelves, reading nooks, warm lamps.", icon: BookOpen, gradient: "from-yellow-700 to-amber-800", accent: "text-yellow-400", href: "/room/library" },
+    { name: "Gaming", description: "Neon gaming desks, dual monitors, leaderboard.", icon: Gamepad2, gradient: "from-cyan-600 to-blue-700", accent: "text-cyan-400", href: "/room/gaming" },
+    { name: "Rooftop", description: "Open-air terrace, fairy lights, sky views.", icon: Trees, gradient: "from-lime-600 to-green-700", accent: "text-lime-400", href: "/room/rooftop" },
+    { name: "Theater", description: "Cinema recliners, massive curved screen.", icon: Clapperboard, gradient: "from-red-700 to-rose-800", accent: "text-red-400", href: "/room/theater" },
 ];
 
 export default function Templates() {
     return (
         <section id="templates" className="relative py-24 sm:py-32">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Section header */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    className="text-center mb-16"
+                    className="text-center mb-14"
                 >
-                    <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-4">
-                        Templates
+                    <span className="inline-block px-3 py-1 rounded-full bg-purple-500/8 border border-purple-500/15 text-purple-400 text-xs font-semibold uppercase tracking-wider mb-4">
+                        9 Rooms
                     </span>
                     <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
-                        Start with a beautiful{" "}
-                        <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                            template
-                        </span>
+                        Pick your{" "}
+                        <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">world</span>
                     </h2>
-                    <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                        Pick a pre-built space and customize it — or start from scratch. Your world, your rules.
+                    <p className="text-gray-500 text-lg max-w-lg mx-auto">
+                        Click any room to explore it live in 3D.
                     </p>
                 </motion.div>
 
-                {/* Templates grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {TEMPLATES.map((template, index) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {TEMPLATES.map((t, i) => (
                         <motion.div
-                            key={template.name}
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
+                            key={t.name}
+                            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                            whileInView={{ opacity: 1, y: 0, scale: 1 }}
                             viewport={{ once: true }}
-                            transition={{ delay: index * 0.1 }}
-                            className={`group relative rounded-2xl overflow-hidden border border-white/10 hover:border-white/20 transition-all duration-500 cursor-pointer ${index === 0 ? "sm:col-span-2 lg:col-span-1" : ""}`}
+                            transition={{ delay: i * 0.05, type: "spring", stiffness: 200, damping: 20 }}
                         >
-                            {/* Preview area */}
-                            <div className={`h-48 bg-gradient-to-br ${template.gradient} relative overflow-hidden`}>
-                                {/* Grid overlay */}
-                                <div className="absolute inset-0 opacity-10"
-                                    style={{
-                                        backgroundImage: `
-                      linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)
-                    `,
-                                        backgroundSize: "24px 24px",
-                                    }}
-                                />
-
-                                {/* Icon centered */}
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <template.icon className="w-16 h-16 text-white/30 group-hover:text-white/50 group-hover:scale-110 transition-all duration-500" />
+                            <Link href={t.href} className="block group">
+                                <div className="relative rounded-2xl overflow-hidden border border-white/6 hover:border-white/18 transition-all duration-400 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1">
+                                    <div className={`h-36 bg-gradient-to-br ${t.gradient} relative overflow-hidden`}>
+                                        <div className="absolute inset-0 opacity-8" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <t.icon className="w-14 h-14 text-white/25 group-hover:text-white/50 group-hover:scale-125 transition-all duration-500" />
+                                        </div>
+                                        <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-sm text-white/0 group-hover:text-white/90 text-xs font-medium transition-all duration-300">
+                                            Explore →
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-[#0c0816]">
+                                        <h3 className="text-base font-bold text-white mb-0.5 group-hover:text-cyan-300 transition-colors">{t.name}</h3>
+                                        <p className="text-gray-500 text-sm">{t.description}</p>
+                                    </div>
                                 </div>
-
-                                {/* Floating mini objects */}
-                                <motion.div
-                                    className="absolute top-4 right-4 text-2xl"
-                                    animate={{ y: [0, -5, 0] }}
-                                    transition={{ duration: 3, repeat: Infinity }}
-                                >
-                                    {template.name === "Classroom" ? "📚" : template.name === "Modern Office" ? "💻" : template.name === "Pixel Café" ? "☕" : template.name === "Conference Hall" ? "🎤" : "🎉"}
-                                </motion.div>
-                            </div>
-
-                            {/* Info */}
-                            <div className="p-5 bg-gray-900/80">
-                                <h3 className="text-lg font-bold text-white mb-1">{template.name}</h3>
-                                <p className="text-gray-400 text-sm mb-3">{template.description}</p>
-                                <p className={`text-xs font-medium ${template.accentColor}`}>{template.objects}</p>
-                            </div>
+                            </Link>
                         </motion.div>
                     ))}
                 </div>

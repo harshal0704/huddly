@@ -159,7 +159,7 @@ function ToolbarButton({
     danger,
     onClick,
 }: {
-    icon: React.ElementType;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
     active?: boolean;
     danger?: boolean;
@@ -176,7 +176,7 @@ function ToolbarButton({
                     : "text-gray-400 hover:text-white hover:bg-white/10"
                 }`}
         >
-            <Icon className="w-4.5 h-4.5" />
+            <Icon className="w-5 h-5" />
         </button>
     );
 }

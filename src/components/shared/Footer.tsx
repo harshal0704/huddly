@@ -1,77 +1,66 @@
 import React from "react";
 import Link from "next/link";
-import { Github, Twitter, Youtube, Heart } from "lucide-react";
+import Image from "next/image";
+import { Github, Twitter, Heart } from "lucide-react";
 
 const FOOTER_LINKS = {
     Product: [
         { name: "Features", href: "#features" },
         { name: "Templates", href: "#templates" },
         { name: "Demo", href: "/room/demo" },
+        { name: "Dashboard", href: "/dashboard" },
     ],
-    Resources: [
-        { name: "Documentation", href: "/docs" },
-        { name: "API Reference", href: "/api-reference" },
-        { name: "Status", href: "/status" },
-        { name: "Changelog", href: "/changelog" },
-    ],
-    Legal: [
+    Company: [
         { name: "Privacy", href: "/privacy" },
         { name: "Terms", href: "/terms" },
-        { name: "Security", href: "/security" },
     ],
 };
 
 const SOCIALS = [
     { icon: Twitter, href: "#", label: "Twitter" },
     { icon: Github, href: "#", label: "GitHub" },
-    { icon: Youtube, href: "#", label: "YouTube" },
 ];
 
 export default function Footer() {
     return (
-        <footer className="relative bg-gray-950 border-t border-white/5 pt-16 pb-8">
-            {/* Subtle top glow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
+        <footer className="relative bg-[#050208] border-t border-white/5 pt-12 pb-6">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-px bg-gradient-to-r from-transparent via-purple-500/40 to-transparent" />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Top section */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-10">
                     {/* Brand */}
                     <div className="col-span-2 md:col-span-1">
-                        <Link href="/" className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                                <span className="text-sm">🏠</span>
+                        <Link href="/" className="flex items-center gap-2 mb-3">
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-purple-500/20 overflow-hidden">
+                                <Image src="/header-logo.png" alt="Huddly" width={32} height={32} className="object-cover" />
                             </div>
                             <span className="text-lg font-bold text-white">Huddly</span>
                         </Link>
-                        <p className="text-gray-500 text-sm leading-relaxed mb-4">
-                            The friendliest virtual world for classrooms, offices, and communities.
+                        <p className="text-gray-500 text-sm leading-relaxed mb-4 max-w-xs">
+                            The friendliest 3D virtual world for teams.
                         </p>
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                             {SOCIALS.map((social) => (
                                 <a
                                     key={social.label}
                                     href={social.href}
-                                    className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+                                    className="w-8 h-8 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition-all"
                                     aria-label={social.label}
                                 >
-                                    <social.icon className="w-4 h-4" />
+                                    <social.icon className="w-3.5 h-3.5" />
                                 </a>
                             ))}
                         </div>
                     </div>
 
-                    {/* Link columns */}
+                    {/* Links */}
                     {Object.entries(FOOTER_LINKS).map(([category, links]) => (
                         <div key={category}>
-                            <h4 className="text-white font-semibold text-sm mb-4">{category}</h4>
-                            <ul className="space-y-2.5">
+                            <h4 className="text-white font-semibold text-sm mb-3">{category}</h4>
+                            <ul className="space-y-2">
                                 {links.map((link) => (
                                     <li key={link.name}>
-                                        <a
-                                            href={link.href}
-                                            className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
-                                        >
+                                        <a href={link.href} className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
                                             {link.name}
                                         </a>
                                     </li>
@@ -81,24 +70,15 @@ export default function Footer() {
                     ))}
                 </div>
 
-                {/* Divider */}
-                <div className="border-t border-white/5 pt-8">
-                    {/* Made with love */}
-                    <div className="text-center mb-6">
-                        <p className="text-lg font-medium text-gray-300 flex items-center justify-center gap-2" style={{ fontFamily: "'Inter', sans-serif" }}>
-                            Made with <Heart className="w-5 h-5 fill-red-500 text-red-500 animate-pulse" /> by{" "}
-                            <span className="font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-                                Harshal
-                            </span>
-                        </p>
-                    </div>
-
-                    {/* Copyright */}
-                    <div className="text-center">
-                        <p className="text-gray-600 text-sm">
-                            © {new Date().getFullYear()} Huddly. All rights reserved.
-                        </p>
-                    </div>
+                {/* Bottom bar */}
+                <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p className="text-gray-600 text-xs">
+                        © {new Date().getFullYear()} Huddly. All rights reserved.
+                    </p>
+                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                        Made with <Heart className="w-3 h-3 fill-red-500 text-red-500" /> by{" "}
+                        <span className="font-semibold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">Harshal</span>
+                    </p>
                 </div>
             </div>
         </footer>

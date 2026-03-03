@@ -44,7 +44,7 @@ export interface Room {
     updatedAt: Date;
 }
 
-export type RoomTemplate = "classroom" | "office" | "cafe" | "conference" | "party" | "blank";
+export type RoomTemplate = "classroom" | "office" | "cafe" | "conference" | "party" | "library" | "gaming" | "rooftop" | "theater" | "blank";
 
 /** Tiled-compatible map data */
 export interface MapData {
