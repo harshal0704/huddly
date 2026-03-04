@@ -76,8 +76,15 @@ export default function Footer() {
                         © {new Date().getFullYear()} Huddly. All rights reserved.
                     </p>
                     <p className="text-xs text-gray-400 flex items-center gap-1.5">
-                        Made with <Heart className="w-3 h-3 fill-red-500 text-red-500" /> by{" "}
-                        <span className="font-semibold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">Harshal</span>
+                        made with love by{" "}
+                        <a
+                            href="https://harshalsp.vercel.app"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent hover:scale-105 transition-transform"
+                        >
+                            harshalsp
+                        </a>
                     </p>
                 </div>
             </div>
