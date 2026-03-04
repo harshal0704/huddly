@@ -4,22 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, X, MessageCircle, Users as UsersIcon, Hash } from "lucide-react";
 import { Input } from "@/components/ui/input";
-
-interface Message {
-    id: string;
-    user: string;
-    text: string;
-    time: string;
-    type: "global" | "proximity" | "system";
-}
-
-const INITIAL_MESSAGES: Message[] = [
-    { id: "1", user: "System", text: "Welcome to the office! Walk near someone to start chatting.", time: "now", type: "system" },
-    { id: "2", user: "Alex", text: "Hey everyone! 👋", time: "2m", type: "global" },
-    { id: "3", user: "Maya", text: "Meeting in 5 at the whiteboard", time: "1m", type: "global" },
-    { id: "4", user: "Sam", text: "On my way!", time: "1m", type: "global" },
-    { id: "5", user: "Jo", text: "Can someone share the doc link?", time: "30s", type: "global" },
-];
+import { useRealtimeStore } from "@/stores/realtimeStore";
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -27,27 +12,27 @@ interface ChatSidebarProps {
 }
 
 export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
-    const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+    const chatMessages = useRealtimeStore(s => s.chatMessages);
+    const sendChat = useRealtimeStore(s => s.sendChat);
+    const connected = useRealtimeStore(s => s.connected);
+
     const [input, setInput] = useState("");
     const [activeTab, setActiveTab] = useState<"global" | "proximity">("global");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+    }, [chatMessages]);
 
     const sendMessage = () => {
         if (!input.trim()) return;
-        const msg: Message = {
-            id: Date.now().toString(),
-            user: "You",
-            text: input,
-            time: "now",
-            type: activeTab,
-        };
-        setMessages((prev) => [...prev, msg]);
+        sendChat(input.trim(), activeTab);
         setInput("");
     };
+
+    const filteredMessages = chatMessages.filter(
+        (m) => m.type === activeTab || m.type === "system"
+    );
 
     return (
         <AnimatePresence>
@@ -64,6 +49,11 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
                         <div className="flex items-center gap-2 text-gray-900 font-semibold">
                             <MessageCircle className="w-4 h-4 text-emerald-600" />
                             Chat
+                            {!connected && (
+                                <span className="text-[10px] text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+                                    Offline
+                                </span>
+                            )}
                         </div>
                         <button
                             onClick={onClose}
@@ -99,35 +89,38 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
 
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                        {messages
-                            .filter((m) => m.type === activeTab || m.type === "system")
-                            .map((msg) => (
-                                <div
-                                    key={msg.id}
-                                    className={`${msg.type === "system"
-                                        ? "text-center text-xs text-gray-400 italic py-1"
-                                        : ""
-                                        }`}
-                                >
-                                    {msg.type !== "system" && (
-                                        <div className={`${msg.user === "You" ? "ml-auto max-w-[85%]" : "max-w-[85%]"}`}>
-                                            <div className="flex items-baseline gap-2 mb-0.5">
-                                                <span className={`text-xs font-semibold ${msg.user === "You" ? "text-emerald-600" : "text-gray-700"}`}>
-                                                    {msg.user}
-                                                </span>
-                                                <span className="text-[10px] text-gray-400">{msg.time}</span>
-                                            </div>
-                                            <div className={`px-3 py-1.5 rounded-xl text-sm ${msg.user === "You"
-                                                ? "bg-emerald-50 text-emerald-800 rounded-tr-sm"
-                                                : "bg-gray-50 text-gray-700 rounded-tl-sm"
-                                                }`}>
-                                                {msg.text}
-                                            </div>
+                        {filteredMessages.length === 0 && (
+                            <div className="text-center text-xs text-gray-400 py-8">
+                                No messages yet. Say hi! 👋
+                            </div>
+                        )}
+                        {filteredMessages.map((msg) => (
+                            <div
+                                key={msg.id}
+                                className={`${msg.type === "system"
+                                    ? "text-center text-xs text-gray-400 italic py-1"
+                                    : ""
+                                    }`}
+                            >
+                                {msg.type !== "system" && (
+                                    <div className={`${msg.user === "You" ? "ml-auto max-w-[85%]" : "max-w-[85%]"}`}>
+                                        <div className="flex items-baseline gap-2 mb-0.5">
+                                            <span className={`text-xs font-semibold ${msg.user === "You" ? "text-emerald-600" : "text-gray-700"}`}>
+                                                {msg.user}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400">{msg.time}</span>
                                         </div>
-                                    )}
-                                    {msg.type === "system" && <span>{msg.text}</span>}
-                                </div>
-                            ))}
+                                        <div className={`px-3 py-1.5 rounded-xl text-sm ${msg.user === "You"
+                                            ? "bg-emerald-50 text-emerald-800 rounded-tr-sm"
+                                            : "bg-gray-50 text-gray-700 rounded-tl-sm"
+                                            }`}>
+                                            {msg.text}
+                                        </div>
+                                    </div>
+                                )}
+                                {msg.type === "system" && <span>{msg.text}</span>}
+                            </div>
+                        ))}
                         <div ref={messagesEndRef} />
                     </div>
 
@@ -140,10 +133,12 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                                 className="flex-1 h-9 text-xs bg-gray-50 border-gray-200"
+                                disabled={!connected}
                             />
                             <button
                                 onClick={sendMessage}
-                                className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                                disabled={!connected}
+                                className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white rounded-lg transition-colors"
                             >
                                 <Send className="w-3.5 h-3.5" />
                             </button>
@@ -154,3 +149,4 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
         </AnimatePresence>
     );
 }
+

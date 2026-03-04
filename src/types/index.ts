@@ -38,13 +38,23 @@ export interface Room {
     visibility: "public" | "private" | "password";
     maxCapacity: number;
     mapData: MapData;
+    customObjects?: CustomObject[];
     thumbnail?: string;
     onlineCount: number;
     createdAt: Date;
     updatedAt: Date;
 }
 
-export type RoomTemplate = "classroom" | "office" | "cafe" | "conference" | "party" | "library" | "gaming" | "rooftop" | "theater" | "blank";
+export type RoomTemplate = "classroom" | "office" | "cafe" | "conference" | "party" | "library" | "gaming" | "rooftop" | "theater" | "blank" | "custom";
+
+/** Custom object placed via room builder */
+export interface CustomObject {
+    id: string;
+    type: string;
+    x: number;
+    z: number;
+    rotation: number;
+}
 
 /** Tiled-compatible map data */
 export interface MapData {
@@ -93,7 +103,14 @@ export type ObjectType =
     | "decoration"
     | "wall"
     | "zone-private"
-    | "zone-stage";
+    | "zone-stage"
+    | "broadcast_screen"
+    | "vending_machine"
+    | "ping_pong"
+    | "printer"
+    | "floor_lamp"
+    | "neon_sign"
+    | "wall_clock";
 
 export interface TilesetRef {
     name: string;
