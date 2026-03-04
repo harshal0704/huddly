@@ -382,9 +382,28 @@ function ReceptionDesk({ position }: { position: [number, number, number] }) {
 /* ═══════════════════════════════════════════════════════════════
    AVATAR
    ═══════════════════════════════════════════════════════════════ */
-function Avatar({ color, name }: { color: string; name: string }) {
+function Avatar({ color, name, cameraTrack }: { color: string; name: string; cameraTrack?: any }) {
+  const ref = useRef<THREE.Group>(null);
+  const videoRef = useRef<HTMLDivElement>(null);
+  const { camera } = useThree();
+
+  useFrame(() => {
+    if (ref.current && videoRef.current) {
+      const worldPos = new THREE.Vector3();
+      ref.current.getWorldPosition(worldPos);
+      const dist = camera.position.distanceTo(worldPos);
+      if (dist < 8) {
+        videoRef.current.style.opacity = "1";
+        videoRef.current.style.transform = "scale(1)";
+      } else {
+        videoRef.current.style.opacity = "0";
+        videoRef.current.style.transform = "scale(0.5)";
+      }
+    }
+  });
+
   return (
-    <group>
+    <group ref={ref}>
       {/* ── Body (torso) */}
       <mesh position={[0, -0.15, 0]} castShadow>
         <capsuleGeometry args={[0.16, 0.35, 12, 12]} />
@@ -454,6 +473,20 @@ function Avatar({ color, name }: { color: string; name: string }) {
           {name}
         </Text>
       </Billboard>
+      {/* ── Floating Video Head ── */}
+      {cameraTrack && (
+        <Html position={[0, 1.8, 0]} transform distanceFactor={2.5} center zIndexRange={[100, 0]}>
+          <div
+            ref={videoRef}
+            className="w-24 h-24 rounded-full overflow-hidden border-4 bg-gray-900 transition-all duration-300 shadow-xl"
+            style={{ borderColor: color, opacity: 0, transform: "scale(0.5)" }}
+          >
+            <div className="w-full h-full [&>.lk-participant-tile]:w-full [&>.lk-participant-tile]:h-full [&>div>video]:object-cover" style={{ pointerEvents: 'none' }}>
+              <ParticipantTile trackRef={cameraTrack} />
+            </div>
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
@@ -1054,6 +1087,10 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
   const players = useRealtimeStore(s => s.players);
   const myId = useRealtimeStore(s => s.myId);
 
+  const tracks = useTracks([
+    { source: Track.Source.Camera, withPlaceholder: false }
+  ], { onlySubscribed: true });
+
   return (
     <>
       <color attach="background" args={["#c5dae8"]} />
@@ -1069,9 +1106,10 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
       {/* Render live players */}
       {Array.from(players.values()).map(p => {
         if (p.id === myId) return null;
+        const pTrack = tracks.find(t => t.participant.identity === p.name);
         return (
           <group key={p.id} position={[p.x, p.y, p.z]}>
-            <Avatar color={p.color} name={p.name} />
+            <Avatar color={p.color} name={p.name} cameraTrack={pTrack} />
           </group>
         );
       })}
