@@ -488,16 +488,50 @@ const CHAIR_POSITIONS: [number, number][] = [
   [-10, -28], [0, -28], [10, -28],
 ];
 
-function PlayerController({ userName, onZoneChange, onNearChair }: { userName: string; onZoneChange: (z: string) => void; onNearChair: (near: boolean) => void }) {
+/* ═══════════════════════════════════════════════════════════════
+   INTERACTIVE OBJECT DEFINITIONS
+   ═══════════════════════════════════════════════════════════════ */
+const INTERACTABLES: { type: string; position: [number, number, number]; radius: number; prompt: string }[] = [
+  // Big Stage TV
+  { type: "broadcast", position: [0, 2.5, -22], radius: 5, prompt: "Stream to Screen" },
+  // Meeting Room TVs
+  { type: "broadcast", position: [-27.5, 1.5, -4], radius: 3, prompt: "Present" },
+  { type: "broadcast", position: [0, 1.8, -9.5], radius: 4, prompt: "Present" },
+  { type: "broadcast", position: [27.5, 1.5, -4], radius: 3, prompt: "Present" },
+  // ScrumBoard
+  { type: "whiteboard", position: [19, 0, 6], radius: 3, prompt: "Edit Board" },
+];
+
+function PlayerController({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, fpsMode }: {
+  userName: string;
+  onZoneChange: (z: string) => void;
+  onNearChair: (near: boolean) => void;
+  onNearInteractable: (interactable: { type: string; prompt: string } | null) => void;
+  onInteract: (type: string) => void;
+  fpsMode: boolean;
+}) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
-  const keys = useRef({ w: false, a: false, s: false, d: false, e: false });
+  const keys = useRef({ w: false, a: false, s: false, d: false });
   const speed = 6;
   const lastZone = useRef("Lobby");
   const isSitting = useRef(false);
   const lastNearChair = useRef(false);
+  const lastInteractable = useRef<string | null>(null);
+  const controlsRef = useRef<any>(null);
 
   const updatePosition = useRealtimeStore(s => s.updatePosition);
+
+  // Lock/unlock pointer based on fpsMode
+  useEffect(() => {
+    if (controlsRef.current) {
+      if (fpsMode) {
+        controlsRef.current.lock();
+      } else {
+        controlsRef.current.unlock();
+      }
+    }
+  }, [fpsMode]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -505,11 +539,20 @@ function PlayerController({ userName, onZoneChange, onNearChair }: { userName: s
       if (k in keys.current) (keys.current as any)[k] = true;
       if (k === "e" && ref.current) {
         const px = ref.current.position.x, pz = ref.current.position.z;
+        // Check chair interaction
         const nearSeat = CHAIR_POSITIONS.some(([cx, cz]) => Math.abs(px - cx) < 1.5 && Math.abs(pz - cz) < 1.5);
         if (nearSeat) {
           isSitting.current = !isSitting.current;
           if (isSitting.current) ref.current.position.y = 0.3;
           else ref.current.position.y = 0.6;
+        }
+        // Check interactable objects
+        for (const obj of INTERACTABLES) {
+          const dx = px - obj.position[0], dz = pz - obj.position[2];
+          if (Math.sqrt(dx * dx + dz * dz) < obj.radius) {
+            onInteract(obj.type);
+            break;
+          }
         }
       }
     };
@@ -517,26 +560,45 @@ function PlayerController({ userName, onZoneChange, onNearChair }: { userName: s
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
-  }, []);
+  }, [onInteract]);
 
   useFrame((_, dt) => {
     if (!ref.current) return;
 
-    // Check chair proximity for HUD
     const px = ref.current.position.x, pz = ref.current.position.z;
+
+    // Check chair proximity for HUD
     const nearSeat = CHAIR_POSITIONS.some(([cx, cz]) => Math.abs(px - cx) < 1.5 && Math.abs(pz - cz) < 1.5);
     if (nearSeat !== lastNearChair.current) { lastNearChair.current = nearSeat; onNearChair(nearSeat); }
 
-    if (!isSitting.current) {
+    // Check interactable proximity
+    let closestInteractable: { type: string; prompt: string } | null = null;
+    let closestDist = Infinity;
+    for (const obj of INTERACTABLES) {
+      const dx = px - obj.position[0], dz = pz - obj.position[2];
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < obj.radius && dist < closestDist) {
+        closestDist = dist;
+        closestInteractable = { type: obj.type, prompt: obj.prompt };
+      }
+    }
+    const interactKey = closestInteractable?.type || null;
+    if (interactKey !== lastInteractable.current) {
+      lastInteractable.current = interactKey;
+      onNearInteractable(closestInteractable);
+    }
+
+    // Movement (only when in FPS mode)
+    if (!isSitting.current && fpsMode) {
       const { w, a, s, d } = keys.current;
       const direction = new THREE.Vector3();
       const frontVector = new THREE.Vector3(0, 0, (s ? 1 : 0) - (w ? 1 : 0));
       const sideVector = new THREE.Vector3((a ? 1 : 0) - (d ? 1 : 0), 0, 0);
 
-      direction.subVectors(frontVector, sideVector).normalize().multiplyScalar(speed * dt).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
+      direction.addVectors(frontVector, sideVector).normalize().multiplyScalar(speed * dt).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
 
-      const nx = ref.current.position.x - direction.x;
-      const nz = ref.current.position.z - direction.z;
+      const nx = ref.current.position.x + direction.x;
+      const nz = ref.current.position.z + direction.z;
 
       const clampX = Math.max(-28, Math.min(28, nx));
       const clampZ = Math.max(-28, Math.min(28, nz));
@@ -550,10 +612,10 @@ function PlayerController({ userName, onZoneChange, onNearChair }: { userName: s
 
     // First person camera lock inside head
     const targetCamPos = ref.current.position.clone();
-    targetCamPos.y += 1.4; // Eye-level (higher than before for true 1st person scale)
+    targetCamPos.y += 1.4;
     camera.position.lerp(targetCamPos, 0.3);
 
-    // Broadcast position randomly per frame (throttle) to avoid network flooding
+    // Broadcast position (throttled)
     if (Math.random() < 0.1) {
       updatePosition(ref.current.position.x, ref.current.position.y, ref.current.position.z, lastZone.current);
     }
@@ -561,8 +623,7 @@ function PlayerController({ userName, onZoneChange, onNearChair }: { userName: s
 
   return (
     <group ref={ref} position={[0, 0.6, 24]}>
-      {/* Self avatar goes here but hidden for FPS to avoid clipping */}
-      <PointerLockControls makeDefault />
+      <PointerLockControls ref={controlsRef} />
     </group>
   );
 }
@@ -981,7 +1042,15 @@ function PartyLayout() {
 /* ═══════════════════════════════════════════════════════════════
    MAIN SCENE
    ═══════════════════════════════════════════════════════════════ */
-function Scene({ userName, onZoneChange, onNearChair, template }: { userName: string; onZoneChange: (z: string) => void; onNearChair: (near: boolean) => void; template: string }) {
+function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, template, fpsMode }: {
+  userName: string;
+  onZoneChange: (z: string) => void;
+  onNearChair: (near: boolean) => void;
+  onNearInteractable: (interactable: { type: string; prompt: string } | null) => void;
+  onInteract: (type: string) => void;
+  template: string;
+  fpsMode: boolean;
+}) {
   const players = useRealtimeStore(s => s.players);
   const myId = useRealtimeStore(s => s.myId);
 
@@ -999,7 +1068,7 @@ function Scene({ userName, onZoneChange, onNearChair, template }: { userName: st
 
       {/* Render live players */}
       {Array.from(players.values()).map(p => {
-        if (p.id === myId) return null; // Don't render self in FPS
+        if (p.id === myId) return null;
         return (
           <group key={p.id} position={[p.x, p.y, p.z]}>
             <Avatar color={p.color} name={p.name} />
@@ -1007,7 +1076,14 @@ function Scene({ userName, onZoneChange, onNearChair, template }: { userName: st
         );
       })}
 
-      <PlayerController userName={userName} onZoneChange={onZoneChange} onNearChair={onNearChair} />
+      <PlayerController
+        userName={userName}
+        onZoneChange={onZoneChange}
+        onNearChair={onNearChair}
+        onNearInteractable={onNearInteractable}
+        onInteract={onInteract}
+        fpsMode={fpsMode}
+      />
     </>
   );
 }
@@ -1018,19 +1094,45 @@ function Scene({ userName, onZoneChange, onNearChair, template }: { userName: st
 export default function ThreeRoom({ roomId, userName = "You", template = "office" }: ThreeRoomProps) {
   const [currentZone, setCurrentZone] = useState("Lobby");
   const [nearChair, setNearChair] = useState(false);
+  const [nearInteractable, setNearInteractable] = useState<{ type: string; prompt: string } | null>(null);
+  const [fpsMode, setFpsMode] = useState(false);
+  const [entered, setEntered] = useState(false);
   const connect = useRealtimeStore(s => s.connect);
   const disconnect = useRealtimeStore(s => s.disconnect);
-  const [locked, setLocked] = useState(false);
 
   useEffect(() => {
     connect(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001", userName, roomId);
     return () => disconnect();
   }, [roomId, userName, connect, disconnect]);
 
+  // Tab key toggles between FPS mode and UI mode
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Tab" && entered) {
+        e.preventDefault();
+        setFpsMode(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [entered]);
+
+  const handleEnter = () => {
+    setEntered(true);
+    setFpsMode(true);
+  };
+
+  const handleInteract = (type: string) => {
+    // When interacting with objects, switch to UI mode so user can use the panel
+    setFpsMode(false);
+    // Dispatch custom event so the room page can open the correct panel
+    window.dispatchEvent(new CustomEvent("huddly:interact", { detail: { type } }));
+  };
+
   return (
     <div className="w-full h-full relative three-canvas">
-      {!locked && (
-        <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-sm flex items-center justify-center cursor-pointer" onClick={() => setLocked(true)}>
+      {!entered && (
+        <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-sm flex items-center justify-center cursor-pointer" onClick={handleEnter}>
           <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl flex flex-col items-center">
             <span className="text-4xl mb-3">🖱️</span>
             <span className="text-xl font-bold text-gray-900">Click to Enter</span>
@@ -1043,9 +1145,16 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
         shadows
         camera={{ position: [0, 1.25, 24], fov: 60, near: 0.1, far: 200 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.4 }}
-        onPointerDown={() => setLocked(true)}
       >
-        <Scene userName={userName} onZoneChange={setCurrentZone} onNearChair={setNearChair} template={template} />
+        <Scene
+          userName={userName}
+          onZoneChange={setCurrentZone}
+          onNearChair={setNearChair}
+          onNearInteractable={setNearInteractable}
+          onInteract={handleInteract}
+          template={template}
+          fpsMode={fpsMode}
+        />
       </Canvas>
 
       {/* Zone indicator */}
@@ -1054,22 +1163,39 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
         <span className="text-white text-sm font-semibold">{currentZone}</span>
       </div>
 
+      {/* Mode indicator */}
+      {entered && (
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10">
+          <span className="text-sm">{fpsMode ? "🔒" : "🖱️"}</span>
+          <span className="text-white text-xs font-medium">{fpsMode ? "FPS Mode" : "UI Mode"}</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-white text-[10px] font-mono">Tab</kbd>
+        </div>
+      )}
+
       {/* Sit prompt */}
-      {nearChair && locked && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600/90 backdrop-blur-sm text-white text-sm font-semibold shadow-lg animate-bounce">
+      {nearChair && fpsMode && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600/90 backdrop-blur-sm text-white text-sm font-semibold shadow-lg animate-bounce">
           <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-xs font-mono">E</kbd>
           Sit / Stand
         </div>
       )}
 
+      {/* Interactive object prompt */}
+      {nearInteractable && fpsMode && !nearChair && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600/90 backdrop-blur-sm text-white text-sm font-semibold shadow-lg animate-pulse">
+          <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-xs font-mono">E</kbd>
+          {nearInteractable.prompt}
+        </div>
+      )}
+
       {/* Crosshair */}
-      {locked && (
+      {fpsMode && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-1.5 h-1.5 rounded-full bg-white mix-blend-difference pointer-events-none" />
       )}
 
-      {/* WASD hint */}
+      {/* Controls hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 text-gray-500 text-xs bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full select-none pointer-events-none">
-        Movement: WASD · Look: Mouse · Interact: E · Exit Look: ESC
+        Movement: WASD · Look: Mouse · Interact: E · Toggle Mode: Tab
       </div>
     </div>
   );

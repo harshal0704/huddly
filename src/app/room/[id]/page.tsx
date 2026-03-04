@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, use } from "react";
+import React, { useState, useCallback, useEffect, use } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import ChatSidebar from "@/components/room/ChatSidebar";
@@ -60,6 +60,20 @@ export default function RoomPage({ params }: RoomPageProps) {
 
     const handleEmoteSelect = useCallback((emoji: string) => {
         console.log("Emote selected:", emoji);
+    }, []);
+
+    // Listen for object interaction events from ThreeRoom
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail.type === "broadcast") {
+                setIsBroadcastOpen(true);
+            } else if (detail.type === "whiteboard") {
+                setIsWhiteboardOpen(true);
+            }
+        };
+        window.addEventListener("huddly:interact", handler);
+        return () => window.removeEventListener("huddly:interact", handler);
     }, []);
 
     return (
