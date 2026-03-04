@@ -13,7 +13,19 @@ const http = require("http");
 
 const PORT = process.env.SOCKET_PORT || 3001;
 
-const server = http.createServer();
+const server = http.createServer((req, res) => {
+    // Basic health check endpoint to wake up Render instances
+    if (req.method === "GET" && req.url === "/health") {
+        res.writeHead(200, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+        });
+        res.end(JSON.stringify({ status: "alive" }));
+        return;
+    }
+    res.writeHead(404);
+    res.end();
+});
 const io = new Server(server, {
     cors: {
         origin: process.env.CLIENT_URL || "http://localhost:3000",
