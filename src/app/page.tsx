@@ -10,15 +10,15 @@ import Footer from "@/components/shared/Footer";
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-[#050208] relative">
+    <main className="min-h-screen bg-[#FAFAF8] relative">
       <ScrollProgress />
       <Navbar />
       <Hero />
-      <GradientDivider from="#7c3aed" to="#06b6d4" />
+      <GradientDivider from="#2D6A4F" to="#52B788" />
       <Features />
-      <GradientDivider from="#06b6d4" to="#7c3aed" flip />
+      <GradientDivider from="#52B788" to="#D4A373" flip />
       <Templates />
-      <GradientDivider from="#7c3aed" to="#3b82f6" />
+      <GradientDivider from="#D4A373" to="#2D6A4F" />
       <HowItWorks />
       <CTABanner />
       <Footer />

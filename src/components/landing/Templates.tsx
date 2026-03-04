@@ -4,20 +4,19 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-    GraduationCap, Building2, Coffee, Mic2, PartyPopper,
-    BookOpen, Gamepad2, Trees, Clapperboard
+    Building2, Coffee, Mic2,
+    BookOpen, Gamepad2, Trees
 } from "lucide-react";
 
 const TEMPLATES = [
-    { name: "Classroom", description: "Desks, podium, whiteboard & broadcast screen.", icon: GraduationCap, gradient: "from-blue-600 to-indigo-700", accent: "text-blue-400", href: "/room/demo" },
-    { name: "Office", description: "Open plan with huddle rooms and lounge area.", icon: Building2, gradient: "from-emerald-600 to-teal-700", accent: "text-emerald-400", href: "/room/office" },
-    { name: "Café", description: "Cozy coffee bar, round tables, warm vibes.", icon: Coffee, gradient: "from-amber-600 to-orange-700", accent: "text-amber-400", href: "/room/cafe" },
-    { name: "Conference", description: "Big stage, tiered seating, triple screens.", icon: Mic2, gradient: "from-violet-600 to-purple-700", accent: "text-violet-400", href: "/room/conference" },
-    { name: "Party", description: "DJ booth, LED dance floor, neon everywhere.", icon: PartyPopper, gradient: "from-pink-600 to-rose-700", accent: "text-pink-400", href: "/room/party" },
-    { name: "Library", description: "Tall bookshelves, reading nooks, warm lamps.", icon: BookOpen, gradient: "from-yellow-700 to-amber-800", accent: "text-yellow-400", href: "/room/library" },
-    { name: "Gaming", description: "Neon gaming desks, dual monitors, leaderboard.", icon: Gamepad2, gradient: "from-cyan-600 to-blue-700", accent: "text-cyan-400", href: "/room/gaming" },
-    { name: "Rooftop", description: "Open-air terrace, fairy lights, sky views.", icon: Trees, gradient: "from-lime-600 to-green-700", accent: "text-lime-400", href: "/room/rooftop" },
-    { name: "Theater", description: "Cinema recliners, massive curved screen.", icon: Clapperboard, gradient: "from-red-700 to-rose-800", accent: "text-red-400", href: "/room/theater" },
+    { name: "Lobby", description: "Reception desk, welcome sign, avatar kiosk.", icon: Building2, gradient: "from-emerald-600 to-teal-700", accent: "text-emerald-400", href: "/room/office" },
+    { name: "Workspace", description: "Hot desks in pods, standing desks, monitor stands.", icon: Building2, gradient: "from-amber-600 to-orange-700", accent: "text-amber-400", href: "/room/office" },
+    { name: "Meeting Pods", description: "Glass-walled rooms with auto video calls.", icon: Mic2, gradient: "from-teal-600 to-emerald-700", accent: "text-teal-400", href: "/room/office" },
+    { name: "Café", description: "Cozy coffee bar, bistro tables, warm vibes.", icon: Coffee, gradient: "from-amber-700 to-yellow-800", accent: "text-amber-400", href: "/room/office" },
+    { name: "Stage", description: "Podium, big screen, auditorium seating.", icon: Mic2, gradient: "from-emerald-700 to-green-800", accent: "text-emerald-400", href: "/room/office" },
+    { name: "Library", description: "Tall bookshelves, reading nooks, warm lamps.", icon: BookOpen, gradient: "from-yellow-700 to-amber-800", accent: "text-yellow-400", href: "/room/office" },
+    { name: "Gaming", description: "Gaming desks, neon accents, arcade cabinet.", icon: Gamepad2, gradient: "from-teal-500 to-cyan-600", accent: "text-teal-400", href: "/room/office" },
+    { name: "Rooftop", description: "Open-air terrace, fairy lights, sky views.", icon: Trees, gradient: "from-green-600 to-emerald-700", accent: "text-green-400", href: "/room/office" },
 ];
 
 export default function Templates() {
@@ -30,15 +29,15 @@ export default function Templates() {
                     viewport={{ once: true }}
                     className="text-center mb-14"
                 >
-                    <span className="inline-block px-3 py-1 rounded-full bg-purple-500/8 border border-purple-500/15 text-purple-400 text-xs font-semibold uppercase tracking-wider mb-4">
-                        9 Rooms
+                    <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold uppercase tracking-wider mb-4">
+                        Office Zones
                     </span>
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
-                        Pick your{" "}
-                        <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">world</span>
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 mb-4">
+                        Explore the{" "}
+                        <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">office</span>
                     </h2>
                     <p className="text-gray-500 text-lg max-w-lg mx-auto">
-                        Click any room to explore it live in 3D.
+                        Walk through every zone in one 3D office.
                     </p>
                 </motion.div>
 
@@ -52,7 +51,7 @@ export default function Templates() {
                             transition={{ delay: i * 0.05, type: "spring", stiffness: 200, damping: 20 }}
                         >
                             <Link href={t.href} className="block group">
-                                <div className="relative rounded-2xl overflow-hidden border border-white/6 hover:border-white/18 transition-all duration-400 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1">
+                                <div className="relative rounded-2xl overflow-hidden border border-black/5 hover:border-black/15 transition-all duration-400 hover:shadow-xl hover:shadow-black/5 hover:-translate-y-1 bg-white">
                                     <div className={`h-36 bg-gradient-to-br ${t.gradient} relative overflow-hidden`}>
                                         <div className="absolute inset-0 opacity-8" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
                                         <div className="absolute inset-0 flex items-center justify-center">
@@ -62,8 +61,8 @@ export default function Templates() {
                                             Explore →
                                         </div>
                                     </div>
-                                    <div className="p-4 bg-[#0c0816]">
-                                        <h3 className="text-base font-bold text-white mb-0.5 group-hover:text-cyan-300 transition-colors">{t.name}</h3>
+                                    <div className="p-4 bg-white">
+                                        <h3 className="text-base font-bold text-gray-900 mb-0.5 group-hover:text-emerald-700 transition-colors">{t.name}</h3>
                                         <p className="text-gray-500 text-sm">{t.description}</p>
                                     </div>
                                 </div>
@@ -72,6 +71,6 @@ export default function Templates() {
                     ))}
                 </div>
             </div>
-        </section>
+        </section >
     );
 }

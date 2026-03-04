@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --primary: #7c3aed;
-  --primary-light: #a78bfa;
-  --accent: #06b6d4;
-  --accent-light: #22d3ee;
-  --background: #050208;
-  --background-alt: #0c0816;
-  --foreground: #f0edff;
-  --surface: rgba(255, 255, 255, 0.03);
-  --surface-hover: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.16);
+  --primary: #2D6A4F;
+  --primary-light: #52B788;
+  --accent: #D4A373;
+  --accent-light: #E9C46A;
+  --background: #FAFAF8;
+  --background-alt: #F0EDE6;
+  --foreground: #1a1a1a;
+  --surface: rgba(0, 0, 0, 0.02);
+  --surface-hover: rgba(0, 0, 0, 0.05);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.16);
 }
 
 @theme inline {
@@ -43,12 +43,12 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(124, 58, 237, 0.25);
+  background: rgba(45, 106, 79, 0.2);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 58, 237, 0.5);
+  background: rgba(45, 106, 79, 0.4);
 }
 
 /* Keyframes */
@@ -80,11 +80,11 @@ html {
 
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(124, 58, 237, 0.15), 0 0 60px rgba(6, 182, 212, 0.08);
+    box-shadow: 0 0 20px rgba(45, 106, 79, 0.1), 0 0 60px rgba(212, 163, 115, 0.05);
   }
 
   50% {
-    box-shadow: 0 0 40px rgba(124, 58, 237, 0.25), 0 0 80px rgba(6, 182, 212, 0.15);
+    box-shadow: 0 0 40px rgba(45, 106, 79, 0.15), 0 0 80px rgba(212, 163, 115, 0.1);
   }
 }
 
@@ -121,7 +121,7 @@ html {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.03), transparent);
   background-size: 1000px 100%;
   animation: shimmer 3s infinite;
 }
@@ -131,9 +131,9 @@ html {
   animation: gradient-shift 8s ease infinite;
 }
 
-/* Glass card */
+/* Glass card — warm light version */
 .glass-card {
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.6);
   border: 1px solid var(--border);
   backdrop-filter: blur(24px);
   border-radius: 20px;
@@ -141,10 +141,10 @@ html {
 }
 
 .glass-card:hover {
-  background: var(--surface-hover);
+  background: rgba(255, 255, 255, 0.8);
   border-color: var(--border-hover);
   transform: translateY(-2px);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 0 40px rgba(124, 58, 237, 0.05);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.08), 0 0 40px rgba(45, 106, 79, 0.03);
 }
 
 /* Three.js canvas */
@@ -156,7 +156,7 @@ html {
 
 /* 3D room panels */
 .room-panel {
-  background: rgba(5, 2, 8, 0.88);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(32px);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -164,13 +164,13 @@ html {
 
 /* Selection */
 ::selection {
-  background: rgba(124, 58, 237, 0.3);
-  color: white;
+  background: rgba(45, 106, 79, 0.2);
+  color: #1a1a1a;
 }
 
 /* Text gradient utility */
 .text-gradient {
-  background: linear-gradient(135deg, #7c3aed, #06b6d4, #a78bfa);
+  background: linear-gradient(135deg, #2D6A4F, #D4A373, #52B788);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

@@ -8,7 +8,7 @@ interface GradientDividerProps {
     flip?: boolean;
 }
 
-export default function GradientDivider({ from = "#8b5cf6", to = "#6366f1", flip = false }: GradientDividerProps) {
+export default function GradientDivider({ from = "#2D6A4F", to = "#52B788", flip = false }: GradientDividerProps) {
     return (
         <div className={`relative w-full h-24 overflow-hidden ${flip ? "rotate-180" : ""}`}>
             <svg
