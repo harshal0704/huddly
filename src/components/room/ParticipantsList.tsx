@@ -2,44 +2,23 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Video, VideoOff, Crown } from "lucide-react";
-
-interface Participant {
-    id: string;
-    name: string;
-    color: string;
-    status: string;
-    isMuted: boolean;
-    isCameraOff: boolean;
-    isOwner: boolean;
-    isProximate: boolean;
-}
-
-const MOCK_PARTICIPANTS: Participant[] = [
-    { id: "1", name: "You", color: "from-violet-400 to-purple-500", status: "available", isMuted: false, isCameraOff: false, isOwner: true, isProximate: false },
-    { id: "2", name: "Alex", color: "from-blue-400 to-cyan-500", status: "available", isMuted: false, isCameraOff: false, isOwner: false, isProximate: true },
-    { id: "3", name: "Maya", color: "from-emerald-400 to-teal-500", status: "focused", isMuted: true, isCameraOff: false, isOwner: false, isProximate: true },
-    { id: "4", name: "Sam", color: "from-amber-400 to-orange-500", status: "available", isMuted: false, isCameraOff: true, isOwner: false, isProximate: false },
-    { id: "5", name: "Jo", color: "from-pink-400 to-rose-500", status: "in-meeting", isMuted: true, isCameraOff: false, isOwner: false, isProximate: false },
-    { id: "6", name: "Lee", color: "from-indigo-400 to-blue-500", status: "available", isMuted: false, isCameraOff: false, isOwner: false, isProximate: false },
-    { id: "7", name: "Kai", color: "from-teal-400 to-emerald-500", status: "away", isMuted: true, isCameraOff: true, isOwner: false, isProximate: false },
-    { id: "8", name: "Rui", color: "from-fuchsia-400 to-pink-500", status: "available", isMuted: false, isCameraOff: false, isOwner: false, isProximate: false },
-    { id: "9", name: "Zoe", color: "from-rose-400 to-red-500", status: "available", isMuted: false, isCameraOff: true, isOwner: false, isProximate: false },
-];
+import { Crown, X } from "lucide-react";
+import { useRealtimeStore } from "@/stores/realtimeStore";
 
 interface ParticipantsListProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
-const statusColors: Record<string, string> = {
-    available: "bg-emerald-400",
-    focused: "bg-amber-400",
-    "in-meeting": "bg-violet-400",
-    away: "bg-gray-400",
-};
-
 export default function ParticipantsList({ isOpen, onClose }: ParticipantsListProps) {
+    const players = useRealtimeStore(s => s.players);
+    const myId = useRealtimeStore(s => s.myId);
+    const connected = useRealtimeStore(s => s.connected);
+
+    const playerList = Array.from(players.values());
+    const me = playerList.find(p => p.id === myId);
+    const others = playerList.filter(p => p.id !== myId);
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -50,38 +29,55 @@ export default function ParticipantsList({ isOpen, onClose }: ParticipantsListPr
                     className="fixed left-4 top-20 w-64 bg-gray-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-30 overflow-hidden"
                 >
                     {/* Header */}
-                    <div className="px-4 py-3 border-b border-white/10">
+                    <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                         <h3 className="text-white font-semibold text-sm flex items-center gap-2">
                             <span>Participants</span>
                             <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">
-                                {MOCK_PARTICIPANTS.length}
+                                {playerList.length}
                             </span>
+                            {!connected && (
+                                <span className="text-[10px] text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                    Offline
+                                </span>
+                            )}
                         </h3>
+                        <button
+                            onClick={onClose}
+                            className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
                     </div>
 
                     {/* List */}
                     <div className="max-h-[60vh] overflow-y-auto p-2">
-                        {/* Nearby section */}
-                        {MOCK_PARTICIPANTS.filter((p) => p.isProximate).length > 0 && (
+                        {/* You */}
+                        {me && (
                             <div className="mb-2">
                                 <span className="text-[10px] text-gray-600 uppercase tracking-wider px-2 font-semibold">
-                                    Nearby
+                                    You
                                 </span>
-                                {MOCK_PARTICIPANTS.filter((p) => p.isProximate).map((p) => (
-                                    <ParticipantItem key={p.id} participant={p} />
+                                <ParticipantItem name={me.name} color={me.color} zone={me.zone} isYou />
+                            </div>
+                        )}
+
+                        {/* Others */}
+                        {others.length > 0 && (
+                            <div>
+                                <span className="text-[10px] text-gray-600 uppercase tracking-wider px-2 font-semibold">
+                                    In Room ({others.length})
+                                </span>
+                                {others.map(p => (
+                                    <ParticipantItem key={p.id} name={p.name} color={p.color} zone={p.zone} />
                                 ))}
                             </div>
                         )}
 
-                        {/* Everyone else */}
-                        <div>
-                            <span className="text-[10px] text-gray-600 uppercase tracking-wider px-2 font-semibold">
-                                In Room
-                            </span>
-                            {MOCK_PARTICIPANTS.filter((p) => !p.isProximate).map((p) => (
-                                <ParticipantItem key={p.id} participant={p} />
-                            ))}
-                        </div>
+                        {playerList.length <= 1 && (
+                            <div className="text-center text-xs text-gray-500 py-4">
+                                No one else is here yet
+                            </div>
+                        )}
                     </div>
                 </motion.div>
             )}
@@ -89,39 +85,29 @@ export default function ParticipantsList({ isOpen, onClose }: ParticipantsListPr
     );
 }
 
-function ParticipantItem({ participant }: { participant: Participant }) {
+function ParticipantItem({ name, color, zone, isYou }: { name: string; color: string; zone: string; isYou?: boolean }) {
     return (
         <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group">
             {/* Avatar */}
             <div className="relative">
-                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${participant.color} flex items-center justify-center text-white text-xs font-bold`}>
-                    {participant.name.charAt(0)}
+                <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    style={{ backgroundColor: color }}
+                >
+                    {name.charAt(0).toUpperCase()}
                 </div>
-                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${statusColors[participant.status] || "bg-gray-400"} border-2 border-gray-950`} />
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-gray-950" />
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1">
-                    <span className="text-sm text-white truncate">{participant.name}</span>
-                    {participant.isOwner && <Crown className="w-3 h-3 text-amber-400" />}
+                    <span className="text-sm text-white truncate">{name}</span>
+                    {isYou && <Crown className="w-3 h-3 text-amber-400" />}
                 </div>
-                <span className="text-[10px] text-gray-500 capitalize">{participant.status}</span>
-            </div>
-
-            {/* Controls */}
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {participant.isMuted ? (
-                    <MicOff className="w-3 h-3 text-red-400" />
-                ) : (
-                    <Mic className="w-3 h-3 text-gray-400" />
-                )}
-                {participant.isCameraOff ? (
-                    <VideoOff className="w-3 h-3 text-red-400" />
-                ) : (
-                    <Video className="w-3 h-3 text-gray-400" />
-                )}
+                <span className="text-[10px] text-gray-500">{zone}</span>
             </div>
         </div>
     );
 }
+

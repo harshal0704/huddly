@@ -13,7 +13,9 @@ import WhiteboardPanel from "@/components/room/WhiteboardPanel";
 import BroadcastPanel from "@/components/room/BroadcastPanel";
 import MeetingRoomHUD from "@/components/room/MeetingRoomHUD";
 import AvatarCustomizer from "@/components/room/AvatarCustomizer";
+import RoomBuilder from "@/components/room/RoomBuilder";
 import { useSpacesStore } from "@/stores/spacesStore";
+import { useRealtimeStore } from "@/stores/realtimeStore";
 import LiveKitWrapper from "@/components/room/LiveKitWrapper";
 import { useUser } from "@clerk/nextjs";
 
@@ -29,7 +31,7 @@ const ThreeRoom = dynamic(() => import("@/game/three/ThreeRoom"), {
     ),
 });
 
-const OFFICE_INFO = { name: "Huddly Office", online: 12 };
+
 
 const MEETING_ZONES = ["Meeting Room 1", "Meeting Room 2", "Meeting Room 3"];
 
@@ -42,9 +44,11 @@ export default function RoomPage({ params }: RoomPageProps) {
     const rooms = useSpacesStore((state) => state.rooms);
     const roomInfo = rooms.find((r) => r.id === id) || {
         name: "Huddly Office",
-        onlineCount: 1,
+        onlineCount: 0,
         template: "office"
     };
+
+    const playerCount = useRealtimeStore(s => s.players.size);
 
     const { user } = useUser();
     const userName = user?.firstName || user?.username || `Guest_${Math.floor(Math.random() * 1000)}`;
@@ -58,6 +62,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
     const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
     const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+    const [isBuilderOpen, setIsBuilderOpen] = useState(false);
     const [currentZone, setCurrentZone] = useState("Lobby");
 
     const isInMeeting = MEETING_ZONES.includes(currentZone);
@@ -80,6 +85,17 @@ export default function RoomPage({ params }: RoomPageProps) {
         return () => window.removeEventListener("huddly:interact", handler);
     }, []);
 
+    // B key to toggle room builder
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key.toLowerCase() === "b" && !isChatOpen && !isWhiteboardOpen) {
+                setIsBuilderOpen(prev => !prev);
+            }
+        };
+        window.addEventListener("keydown", handleKey);
+        return () => window.removeEventListener("keydown", handleKey);
+    }, [isChatOpen, isWhiteboardOpen]);
+
     return (
         <LiveKitWrapper roomId={id as string} userName={userName}>
             <div className="relative w-screen h-screen bg-white overflow-hidden">
@@ -93,7 +109,7 @@ export default function RoomPage({ params }: RoomPageProps) {
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                         <span className="font-semibold text-white">{roomInfo.name}</span>
                         <span className="text-gray-500">•</span>
-                        <span className="text-gray-400">{roomInfo.onlineCount} online</span>
+                        <span className="text-gray-400">{playerCount} online</span>
                     </div>
                 </motion.div>
                 <motion.div
@@ -112,8 +128,8 @@ export default function RoomPage({ params }: RoomPageProps) {
                             <span>Sit / Interact</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-500 font-mono text-[9px]">Space</kbd>
-                            <span>Emote</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-500 font-mono text-[9px]">Q</kbd>
+                            <span>Toggle Mode</span>
                         </div>
                     </div>
                 </motion.div>
@@ -124,6 +140,7 @@ export default function RoomPage({ params }: RoomPageProps) {
                         roomId={id as string}
                         userName={userName}
                         template={roomInfo.template}
+                        customObjects={(roomInfo as any).customObjects}
                     />
                 </div>
 
@@ -158,6 +175,22 @@ export default function RoomPage({ params }: RoomPageProps) {
                     isOpen={isBroadcastOpen}
                     onClose={() => setIsBroadcastOpen(false)}
                 />
+
+                {/* Room Builder */}
+                <RoomBuilder
+                    isOpen={isBuilderOpen}
+                    onClose={() => setIsBuilderOpen(false)}
+                    roomId={id as string}
+                />
+
+                {/* Build button */}
+                <button
+                    onClick={() => setIsBuilderOpen(true)}
+                    className="fixed bottom-20 right-4 z-20 w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                    title="Room Builder (B)"
+                >
+                    🏗️
+                </button>
 
                 {/* Bottom toolbar */}
                 <RoomToolbar

@@ -14,7 +14,8 @@ import { Track } from "livekit-client";
 interface ThreeRoomProps {
   roomId: string;
   userName?: string;
-  template?: string; // e.g. "office", "cafe", "party"
+  template?: string;
+  customObjects?: { type: string; x: number; z: number; rotation: number }[];
 }
 
 interface AABB { minX: number; maxX: number; minZ: number; maxZ: number; }
@@ -86,6 +87,14 @@ const COLLIDERS: AABB[] = [
   { minX: -6, maxX: 6, minZ: -20, maxZ: -19.8 },
   // Reception desk
   { minX: -4, maxX: 4, minZ: 22, maxZ: 23.5 },
+  // Whiteboards (solid — can't walk through)
+  { minX: -1.25, maxX: 1.25, minZ: 1.3, maxZ: 1.7 },
+  { minX: -25.25, maxX: -22.75, minZ: -7.7, maxZ: -7.3 },
+  // Vending machines
+  { minX: -28.5, maxX: -27.5, minZ: 1.5, maxZ: 2.5 },
+  { minX: 27.5, maxX: 28.5, minZ: 9.5, maxZ: 10.5 },
+  // Ping pong table
+  { minX: 22.5, maxX: 25.5, minZ: -21, maxZ: -19 },
 ];
 
 /* ═══════════════════════════════════════════════════════════════
@@ -533,6 +542,17 @@ const INTERACTABLES: { type: string; position: [number, number, number]; radius:
   { type: "broadcast", position: [27.5, 1.5, -4], radius: 3, prompt: "Present" },
   // ScrumBoard
   { type: "whiteboard", position: [19, 0, 6], radius: 3, prompt: "Edit Board" },
+  // Whiteboards
+  { type: "whiteboard", position: [0, 1.5, 1.5], radius: 3, prompt: "Edit Whiteboard" },
+  { type: "whiteboard", position: [-24, 1.5, -7.5], radius: 3, prompt: "Edit Whiteboard" },
+  // Coffee Machine
+  { type: "coffee", position: [-26, 0, 10], radius: 2, prompt: "☕ Grab Coffee" },
+  // Jukebox
+  { type: "jukebox", position: [-27, 0, 4], radius: 2, prompt: "🎵 Play Music" },
+  // Arcade
+  { type: "arcade", position: [26, 0, -22], radius: 2, prompt: "🎮 Play Arcade" },
+  // Water Cooler
+  { type: "watercooler", position: [18, 0, 10], radius: 2, prompt: "💧 Water Break" },
 ];
 
 function PlayerController({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, fpsMode }: {
@@ -975,6 +995,13 @@ function OfficeWorldLayout() {
       <WallPoster position={[29.3, 1.8, -20]} rotation={[0, -Math.PI / 2, 0]} color="#1abc9c" text="LEVEL UP" />
       <WallPoster position={[-29.3, 1.8, -16]} rotation={[0, Math.PI / 2, 0]} color="#f39c12" text="READ MORE" />
       <WallPoster position={[0, 1.8, 29.3]} color="#2ecc71" text="WELCOME" />
+
+      {/* ── EXTRA INTERACTIVE OBJECTS ──────────── */}
+      <PingPongTable position={[24, 0, -20]} />
+      <VendingMachine position={[-28, 0, 2]} rotation={[0, Math.PI / 2, 0]} />
+      <VendingMachine position={[28, 0, 10]} rotation={[0, -Math.PI / 2, 0]} />
+      <Printer position={[-6, 0.8, 16]} />
+      <Printer position={[6, 0.8, 16]} />
     </>
   );
 }
@@ -1073,9 +1100,524 @@ function PartyLayout() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   CLASSROOM LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+function ClassroomLayout() {
+  return (
+    <group>
+      {/* Floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[40, 30]} />
+        <meshStandardMaterial color="#f0ebe3" roughness={0.9} />
+      </mesh>
+      <gridHelper args={[40, 40, "#bbb", "#ccc"]} position={[0, 0.01, 0]} material-opacity={0.1} material-transparent />
+
+      {/* Walls */}
+      {[
+        [0, 1.5, 14.5, 40, 3, 0.2],
+        [0, 1.5, -14.5, 40, 3, 0.2],
+        [-19.5, 1.5, 0, 0.2, 3, 30],
+        [19.5, 1.5, 0, 0.2, 3, 30],
+      ].map((w, i) => (
+        <mesh key={`wall-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color={P.wall} roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* Teacher's podium */}
+      <RoundedBox args={[2, 0.4, 1]} position={[0, 0.2, -12]} radius={0.04} smoothness={4}>
+        <meshStandardMaterial color="#5C3A1E" roughness={0.6} />
+      </RoundedBox>
+
+      {/* Big screen at the front */}
+      <BroadcastScreen position={[0, 2, -14]} size={[6, 3]} />
+
+      {/* Student desks in rows */}
+      {[-3, 0, 3, 6, 9].map(z =>
+        [-12, -6, 0, 6, 12].map(x => (
+          <group key={`desk-${x}-${z}`}>
+            <Desk position={[x, 0, z]} />
+            <Chair position={[x, 0, z + 1.2]} />
+          </group>
+        ))
+      )}
+
+      {/* Whiteboard */}
+      <Whiteboard position={[-8, 1.5, -14]} />
+
+      {/* Plants */}
+      <Plant position={[-18, 0, 13]} />
+      <Plant position={[18, 0, 13]} />
+      <Plant position={[-18, 0, -13]} />
+      <Plant position={[18, 0, -13]} />
+
+      {/* Ceiling lights */}
+      <CeilingLight position={[-8, 4, 0]} />
+      <CeilingLight position={[0, 4, 0]} />
+      <CeilingLight position={[8, 4, 0]} />
+      <CeilingLight position={[-8, 4, 8]} />
+      <CeilingLight position={[0, 4, 8]} />
+      <CeilingLight position={[8, 4, 8]} />
+
+      <Bookshelf position={[-18, 0, 0]} />
+      <Bookshelf position={[-18, 0, -4]} />
+      <WallClock position={[0, 2.5, 14.3]} />
+      <NeonSign position={[0, 2.8, 14]} text="📚 CLASSROOM" color="#3B82F6" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONFERENCE LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+function ConferenceLayout() {
+  return (
+    <group>
+      {/* Floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[50, 40]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+
+      {/* Walls */}
+      {[
+        [0, 2, 19.5, 50, 4, 0.2],
+        [0, 2, -19.5, 50, 4, 0.2],
+        [-24.5, 2, 0, 0.2, 4, 40],
+        [24.5, 2, 0, 0.2, 4, 40],
+      ].map((w, i) => (
+        <mesh key={`wall-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color="#16213e" roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* Stage platform */}
+      <mesh position={[0, 0.25, -16]} receiveShadow>
+        <boxGeometry args={[20, 0.5, 6]} />
+        <meshStandardMaterial color="#0f3460" roughness={0.5} metalness={0.3} />
+      </mesh>
+
+      {/* Big screen */}
+      <BroadcastScreen position={[0, 3, -18.5]} size={[12, 5]} />
+
+      {/* Side screens */}
+      <BroadcastScreen position={[-20, 2.5, -16]} rotation={[0, Math.PI / 4, 0]} size={[4, 2.5]} />
+      <BroadcastScreen position={[20, 2.5, -16]} rotation={[0, -Math.PI / 4, 0]} size={[4, 2.5]} />
+
+      {/* Podium */}
+      <RoundedBox args={[1.2, 1.3, 0.6]} position={[0, 0.9, -14]} radius={0.05} smoothness={4}>
+        <meshStandardMaterial color="#e94560" roughness={0.4} metalness={0.2} />
+      </RoundedBox>
+
+      {/* Tiered seating */}
+      {[0, 3, 6, 9, 12].map((z, row) => {
+        const seatsPerRow = 7 + row;
+        const spacing = 3;
+        const startX = -((seatsPerRow - 1) * spacing) / 2;
+        return Array.from({ length: seatsPerRow }, (_, i) => (
+          <group key={`seat-${row}-${i}`}>
+            <Chair position={[startX + i * spacing, row * 0.15, z - 8]} color="#333" />
+          </group>
+        ));
+      })}
+
+      {/* Stage spotlights */}
+      <pointLight position={[-5, 5, -16]} color="#e94560" intensity={1.5} distance={15} />
+      <pointLight position={[5, 5, -16]} color="#0f3460" intensity={1.5} distance={15} />
+      <pointLight position={[0, 6, -14]} color="#fff" intensity={1} distance={20} />
+      <pointLight position={[0, 5, 0]} color="#1a1a3e" intensity={0.3} distance={30} />
+
+      <Plant position={[-22, 0, 18]} />
+      <Plant position={[22, 0, 18]} />
+
+      <NeonSign position={[0, 3.5, -12]} text="🎤 CONFERENCE" color="#e94560" />
+      <NeonSign position={[-20, 2.5, 19]} text="HUDDLY TALKS" color="#0f3460" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADDITIONAL 3D OBJECTS
+   ═══════════════════════════════════════════════════════════════ */
+function PingPongTable({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.76, 0]} castShadow>
+        <boxGeometry args={[2.74, 0.04, 1.52]} />
+        <meshStandardMaterial color="#1a6b3c" roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.86, 0]}>
+        <boxGeometry args={[0.02, 0.15, 1.52]} />
+        <meshStandardMaterial color="#ddd" transparent opacity={0.7} />
+      </mesh>
+      {[[-1.2, 0.38, -0.65], [-1.2, 0.38, 0.65], [1.2, 0.38, -0.65], [1.2, 0.38, 0.65]].map((p, i) => (
+        <mesh key={i} position={p as [number, number, number]}>
+          <cylinderGeometry args={[0.04, 0.04, 0.76, 8]} />
+          <meshStandardMaterial color="#333" metalness={0.6} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function VendingMachine({ position, rotation = [0, 0, 0] as [number, number, number] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <RoundedBox args={[0.9, 1.8, 0.7]} position={[0, 0.9, 0]} radius={0.04} smoothness={4}>
+        <meshStandardMaterial color="#1e3a5f" roughness={0.4} metalness={0.3} />
+      </RoundedBox>
+      <mesh position={[0, 1.1, 0.36]}>
+        <planeGeometry args={[0.7, 1.0]} />
+        <meshStandardMaterial color="#87CEEB" transparent opacity={0.3} metalness={0.8} roughness={0.1} />
+      </mesh>
+      {[0.8, 1.1, 1.4].map((y, i) => (
+        <mesh key={i} position={[0, y, 0.2]}>
+          <boxGeometry args={[0.65, 0.02, 0.3]} />
+          <meshStandardMaterial color="#ccc" metalness={0.5} />
+        </mesh>
+      ))}
+      <Text position={[0, 1.7, 0.36]} fontSize={0.08} color="#fff" anchorX="center">DRINKS</Text>
+    </group>
+  );
+}
+
+function Printer({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <RoundedBox args={[0.5, 0.3, 0.4]} position={[0, 0.15, 0]} radius={0.02} smoothness={4}>
+        <meshStandardMaterial color="#333" roughness={0.5} />
+      </RoundedBox>
+      <mesh position={[0, 0.02, 0.15]}>
+        <boxGeometry args={[0.35, 0.04, 0.1]} />
+        <meshStandardMaterial color="#fff" roughness={0.8} />
+      </mesh>
+      <mesh position={[0.2, 0.28, 0.2]}>
+        <sphereGeometry args={[0.015, 8, 8]} />
+        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} />
+      </mesh>
+    </group>
+  );
+}
+/* ═══════════════════════════════════════════════════════════════
+   LIBRARY LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+function LibraryLayout() {
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[40, 30]} />
+        <meshStandardMaterial color="#3e2723" roughness={0.9} />
+      </mesh>
+
+      {/* Walls */}
+      {[
+        [0, 2, 14.5, 40, 4, 0.2],
+        [0, 2, -14.5, 40, 4, 0.2],
+        [-19.5, 2, 0, 0.2, 4, 30],
+        [19.5, 2, 0, 0.2, 4, 30],
+      ].map((w, i) => (
+        <mesh key={`wall-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color="#5D4037" roughness={0.8} />
+        </mesh>
+      ))}
+
+      {/* Tall bookshelves along walls */}
+      {[-16, -12, -8, 8, 12, 16].map(x => (
+        <Bookshelf key={`bs-${x}`} position={[x, 0, -13.5]} />
+      ))}
+      {[-10, -6, -2, 2, 6, 10].map(z => (
+        <Bookshelf key={`bsw-${z}`} position={[-18.5, 0, z]} />
+      ))}
+
+      {/* Reading tables */}
+      {[-8, 0, 8].map(x => (
+        <group key={`rtable-${x}`}>
+          <Desk position={[x, 0, -4]} />
+          <Chair position={[x - 1, 0, -3]} />
+          <Chair position={[x + 1, 0, -3]} />
+          <FloorLamp position={[x + 2, 0, -4]} lightColor="#fff5e0" />
+        </group>
+      ))}
+
+      {/* Study nooks */}
+      {[-12, -4, 4, 12].map(x => (
+        <group key={`nook-${x}`}>
+          <Desk position={[x, 0, 6]} />
+          <Chair position={[x, 0, 7.2]} />
+        </group>
+      ))}
+
+      {/* Sofa reading area */}
+      <RoundedBox args={[4, 0.5, 1.5]} position={[0, 0.25, 10]} radius={0.1} smoothness={4}>
+        <meshStandardMaterial color="#8D6E63" roughness={0.7} />
+      </RoundedBox>
+
+      {/* Warm lighting */}
+      <pointLight position={[0, 4, 0]} color="#FFD700" intensity={0.5} distance={20} />
+      <pointLight position={[-12, 4, -4]} color="#fff5e0" intensity={0.3} distance={12} />
+      <pointLight position={[12, 4, -4]} color="#fff5e0" intensity={0.3} distance={12} />
+
+      <Plant position={[-18, 0, 13]} />
+      <Plant position={[18, 0, 13]} />
+      <Plant position={[0, 0, 13]} />
+      <WallClock position={[0, 3, 14.3]} />
+      <NeonSign position={[0, 3, 14]} text="📖 QUIET LIBRARY" color="#FFD700" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GAMING LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+function GamingLayout() {
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[40, 30]} />
+        <meshStandardMaterial color="#0a0a0a" roughness={0.8} />
+      </mesh>
+
+      {/* Walls */}
+      {[
+        [0, 2, 14.5, 40, 4, 0.2],
+        [0, 2, -14.5, 40, 4, 0.2],
+        [-19.5, 2, 0, 0.2, 4, 30],
+        [19.5, 2, 0, 0.2, 4, 30],
+      ].map((w, i) => (
+        <mesh key={`wall-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color="#1a1a2e" roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* Arcade row */}
+      {[-12, -8, -4, 0, 4, 8, 12].map(x => (
+        <ArcadeCabinet key={`arc-${x}`} position={[x, 0, -12]} />
+      ))}
+
+      {/* Ping pong tables */}
+      <PingPongTable position={[-10, 0, 2]} />
+      <PingPongTable position={[10, 0, 2]} />
+
+      {/* Gaming PCs */}
+      {[-14, -10, -6, 6, 10, 14].map(x => (
+        <group key={`pc-${x}`}>
+          <Desk position={[x, 0, 8]} />
+          <Chair position={[x, 0, 9.2]} />
+          <BroadcastScreen position={[x, 1.5, 7.5]} size={[1.5, 0.9]} />
+        </group>
+      ))}
+
+      {/* Jukebox & vending */}
+      <JukeBox position={[-17, 0, -4]} />
+      <VendingMachine position={[17, 0, -4]} />
+
+      {/* Neon lighting */}
+      <pointLight position={[0, 4, 0]} color="#a855f7" intensity={1.5} distance={20} />
+      <pointLight position={[-14, 3, -12]} color="#06b6d4" intensity={1} distance={12} />
+      <pointLight position={[14, 3, -12]} color="#ec4899" intensity={1} distance={12} />
+      <pointLight position={[0, 3, 8]} color="#22c55e" intensity={0.8} distance={15} />
+
+      <NeonSign position={[0, 3, -14]} text="🎮 GAMING LOUNGE" color="#a855f7" />
+      <NeonSign position={[-18, 2, 0]} text="PLAY" color="#06b6d4" />
+      <NeonSign position={[18, 2, 0]} text="WIN" color="#ec4899" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOFTOP LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+function RooftopLayout() {
+  return (
+    <group>
+      {/* Rooftop floor (concrete) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[40, 30]} />
+        <meshStandardMaterial color="#4a4a4a" roughness={0.9} />
+      </mesh>
+
+      {/* Low railings (no full walls — open sky) */}
+      {[
+        [0, 0.5, 14.5, 40, 1, 0.1],
+        [0, 0.5, -14.5, 40, 1, 0.1],
+        [-19.5, 0.5, 0, 0.1, 1, 30],
+        [19.5, 0.5, 0, 0.1, 1, 30],
+      ].map((w, i) => (
+        <mesh key={`rail-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color="#666" metalness={0.6} roughness={0.3} />
+        </mesh>
+      ))}
+
+      {/* Bar counter */}
+      <RoundedBox args={[8, 1.2, 1]} position={[0, 0.6, -10]} radius={0.05} smoothness={4}>
+        <meshStandardMaterial color="#2c1810" roughness={0.5} />
+      </RoundedBox>
+      <CoffeeMachine position={[-2, 1.2, -10]} />
+      <CoffeeMachine position={[2, 1.2, -10]} />
+
+      {/* Lounge seating (sofas) */}
+      {[-12, -4, 4, 12].map(x => (
+        <group key={`lounge-${x}`}>
+          <RoundedBox args={[3, 0.5, 1.2]} position={[x, 0.25, 4]} radius={0.1} smoothness={4}>
+            <meshStandardMaterial color="#4a2c2a" roughness={0.7} />
+          </RoundedBox>
+          <RoundedBox args={[1.5, 0.5, 1.2]} position={[x, 0.25, 8]} radius={0.1} smoothness={4}>
+            <meshStandardMaterial color="#4a2c2a" roughness={0.7} />
+          </RoundedBox>
+        </group>
+      ))}
+
+      {/* String lights */}
+      {[-15, -5, 5, 15].map(x => (
+        <pointLight key={`sl-${x}`} position={[x, 3.5, 0]} color="#FFE4B5" intensity={0.4} distance={8} />
+      ))}
+
+      {/* City skyline backdrop (simplified tall boxes) */}
+      {[-30, -24, -18, -12, -6, 0, 6, 12, 18, 24, 30].map((x, i) => {
+        const h = 4 + Math.sin(i * 1.7) * 3;
+        return (
+          <mesh key={`building-${i}`} position={[x, h / 2, -20]}>
+            <boxGeometry args={[4, h, 2]} />
+            <meshStandardMaterial color={`hsl(220, 20%, ${15 + i * 3}%)`} />
+          </mesh>
+        );
+      })}
+
+      <Plant position={[-18, 0, 13]} />
+      <Plant position={[18, 0, 13]} />
+      <Plant position={[-18, 0, -13]} />
+      <Plant position={[18, 0, -13]} />
+
+      <NeonSign position={[0, 2, -12]} text="🌃 ROOFTOP BAR" color="#FFE4B5" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   THEATER LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+function TheaterLayout() {
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[50, 40]} />
+        <meshStandardMaterial color="#1a0a0a" roughness={0.8} />
+      </mesh>
+
+      {/* Walls */}
+      {[
+        [0, 3, 19.5, 50, 6, 0.2],
+        [0, 3, -19.5, 50, 6, 0.2],
+        [-24.5, 3, 0, 0.2, 6, 40],
+        [24.5, 3, 0, 0.2, 6, 40],
+      ].map((w, i) => (
+        <mesh key={`wall-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color="#2d0a0a" roughness={0.8} />
+        </mesh>
+      ))}
+
+      {/* Stage */}
+      <mesh position={[0, 0.4, -15]} receiveShadow>
+        <boxGeometry args={[18, 0.8, 8]} />
+        <meshStandardMaterial color="#4a1a1a" roughness={0.6} />
+      </mesh>
+
+      {/* Curtains (side planes) */}
+      {[-10, 10].map(x => (
+        <mesh key={`curtain-${x}`} position={[x, 2, -15]}>
+          <boxGeometry args={[0.3, 4, 8]} />
+          <meshStandardMaterial color="#8B0000" roughness={0.9} />
+        </mesh>
+      ))}
+
+      {/* Main screen */}
+      <BroadcastScreen position={[0, 3.5, -18.5]} size={[14, 6]} />
+
+      {/* Tiered seating */}
+      {[0, 3, 6, 9, 12, 15].map((z, row) => {
+        const seats = 8 + row;
+        const spacing = 2.5;
+        const startX = -((seats - 1) * spacing) / 2;
+        return Array.from({ length: seats }, (_, i) => (
+          <Chair key={`seat-${row}-${i}`} position={[startX + i * spacing, row * 0.2, z - 6]} color="#4a1a1a" />
+        ));
+      })}
+
+      {/* Stage spotlights */}
+      <pointLight position={[-6, 6, -15]} color="#FFD700" intensity={2} distance={15} />
+      <pointLight position={[6, 6, -15]} color="#FFD700" intensity={2} distance={15} />
+      <pointLight position={[0, 8, -12]} color="#fff" intensity={1} distance={25} />
+
+      {/* House lights (dim) */}
+      <pointLight position={[0, 6, 5]} color="#331111" intensity={0.2} distance={30} />
+
+      <NeonSign position={[0, 5, -10]} text="🎭 THEATER" color="#FFD700" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BLANK / CUSTOM LAYOUT — renders user-placed objects
+   ═══════════════════════════════════════════════════════════════ */
+function BlankLayout({ customObjects = [] }: { customObjects?: { type: string; x: number; z: number; rotation: number }[] }) {
+  return (
+    <group>
+      {/* Floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[40, 30]} />
+        <meshStandardMaterial color="#e8e8e8" roughness={0.9} />
+      </mesh>
+      <gridHelper args={[40, 40, "#ccc", "#ddd"]} position={[0, 0.01, 0]} material-opacity={0.3} material-transparent />
+
+      {/* Walls */}
+      {[
+        [0, 1.5, 14.5, 40, 3, 0.2],
+        [0, 1.5, -14.5, 40, 3, 0.2],
+        [-19.5, 1.5, 0, 0.2, 3, 30],
+        [19.5, 1.5, 0, 0.2, 3, 30],
+      ].map((w, i) => (
+        <mesh key={`wall-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color="#f5f5f5" roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* Render custom objects */}
+      {customObjects.map((obj, i) => (
+        <group key={`custom-${i}`} position={[obj.x, 0, obj.z]} rotation={[0, obj.rotation * (Math.PI / 180), 0]}>
+          {obj.type === "desk" && <Desk position={[0, 0, 0]} />}
+          {obj.type === "chair" && <Chair position={[0, 0, 0]} />}
+          {obj.type === "plant" && <Plant position={[0, 0, 0]} />}
+          {obj.type === "whiteboard" && <Whiteboard position={[0, 1.5, 0]} />}
+          {obj.type === "broadcast_screen" && <BroadcastScreen position={[0, 2, 0]} />}
+          {obj.type === "bookshelf" && <Bookshelf position={[0, 0, 0]} />}
+          {obj.type === "coffee_machine" && <CoffeeMachine position={[0, 0, 0]} />}
+          {obj.type === "vending_machine" && <VendingMachine position={[0, 0, 0]} />}
+          {obj.type === "ping_pong" && <PingPongTable position={[0, 0, 0]} />}
+          {obj.type === "printer" && <Printer position={[0, 0, 0]} />}
+          {obj.type === "arcade" && <ArcadeCabinet position={[0, 0, 0]} />}
+          {obj.type === "floor_lamp" && <FloorLamp position={[0, 0, 0]} />}
+        </group>
+      ))}
+
+      <CeilingLight position={[-8, 4, 0]} />
+      <CeilingLight position={[0, 4, 0]} />
+      <CeilingLight position={[8, 4, 0]} />
+      <NeonSign position={[0, 2.5, 14]} text="🎨 YOUR SPACE" color="#6366f1" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    MAIN SCENE
    ═══════════════════════════════════════════════════════════════ */
-function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, template, fpsMode }: {
+function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, template, fpsMode, customObjects }: {
   userName: string;
   onZoneChange: (z: string) => void;
   onNearChair: (near: boolean) => void;
@@ -1083,6 +1625,7 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
   onInteract: (type: string) => void;
   template: string;
   fpsMode: boolean;
+  customObjects?: { type: string; x: number; z: number; rotation: number }[];
 }) {
   const players = useRealtimeStore(s => s.players);
   const myId = useRealtimeStore(s => s.myId);
@@ -1101,7 +1644,16 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
       <Sparkles count={40} scale={50} size={2} speed={0.1} color={P.accent} opacity={0.08} />
 
       {/* Render layout based on template */}
-      {template === "cafe" ? <CafeLayout /> : template === "party" ? <PartyLayout /> : <OfficeWorldLayout />}
+      {template === "cafe" ? <CafeLayout />
+        : template === "party" ? <PartyLayout />
+          : template === "classroom" ? <ClassroomLayout />
+            : template === "conference" ? <ConferenceLayout />
+              : template === "library" ? <LibraryLayout />
+                : template === "gaming" ? <GamingLayout />
+                  : template === "rooftop" ? <RooftopLayout />
+                    : template === "theater" ? <TheaterLayout />
+                      : template === "blank" || template === "custom" ? <BlankLayout customObjects={customObjects} />
+                        : <OfficeWorldLayout />}
 
       {/* Render live players */}
       {Array.from(players.values()).map(p => {
@@ -1129,7 +1681,7 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
 /* ═══════════════════════════════════════════════════════════════
    EXPORTED COMPONENT
    ═══════════════════════════════════════════════════════════════ */
-export default function ThreeRoom({ roomId, userName = "You", template = "office" }: ThreeRoomProps) {
+export default function ThreeRoom({ roomId, userName = "You", template = "office", customObjects }: ThreeRoomProps) {
   const [currentZone, setCurrentZone] = useState("Lobby");
   const [nearChair, setNearChair] = useState(false);
   const [nearInteractable, setNearInteractable] = useState<{ type: string; prompt: string } | null>(null);
@@ -1143,10 +1695,10 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
     return () => disconnect();
   }, [roomId, userName, connect, disconnect]);
 
-  // Tab key toggles between FPS mode and UI mode
+  // Q key toggles between FPS mode and UI mode
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Tab" && entered) {
+      if (e.key.toLowerCase() === "q" && entered) {
         e.preventDefault();
         setFpsMode(prev => !prev);
       }
@@ -1192,6 +1744,7 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
           onInteract={handleInteract}
           template={template}
           fpsMode={fpsMode}
+          customObjects={customObjects}
         />
       </Canvas>
 
@@ -1205,8 +1758,8 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
       {entered && (
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10">
           <span className="text-sm">{fpsMode ? "🔒" : "🖱️"}</span>
-          <span className="text-white text-xs font-medium">{fpsMode ? "FPS Mode" : "UI Mode"}</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-white text-[10px] font-mono">Tab</kbd>
+          <span className="text-white text-xs font-medium">{fpsMode ? "Navigation Mode" : "UI Mode"}</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-white text-[10px] font-mono">Q</kbd>
         </div>
       )}
 
@@ -1233,7 +1786,7 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
 
       {/* Controls hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 text-gray-500 text-xs bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full select-none pointer-events-none">
-        Movement: WASD · Look: Mouse · Interact: E · Toggle Mode: Tab
+        Movement: WASD · Look: Mouse · Interact: E · Toggle Mode: Q
       </div>
     </div>
   );
