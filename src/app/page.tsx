@@ -11,9 +11,9 @@ import AmbientBackground from "@/components/landing/AmbientBackground";
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-[#030014] relative overflow-hidden">
+    <main className="min-h-screen bg-[#FAFAF8] relative overflow-hidden">
       <AmbientBackground />
-      <div className="relative z-10 antialiased">
+      <div className="relative z-10 antialiased text-gray-900">
         <ScrollProgress />
         <Navbar />
         <Hero />

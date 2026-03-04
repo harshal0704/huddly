@@ -16,7 +16,7 @@ export default function AmbientBackground() {
                     repeat: Infinity,
                     ease: "linear",
                 }}
-                className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-500/10 via-transparent to-transparent opacity-40 blur-3xl pointer-events-none"
+                className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-100 via-transparent to-transparent opacity-60 blur-3xl pointer-events-none"
             />
             <motion.div
                 animate={{
@@ -30,7 +30,7 @@ export default function AmbientBackground() {
                     repeat: Infinity,
                     ease: "easeInOut",
                 }}
-                className="absolute top-0 right-0 w-[100vw] h-[100vh] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-400/10 via-transparent to-transparent blur-3xl pointer-events-none"
+                className="absolute top-0 right-0 w-[100vw] h-[100vh] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-100 via-transparent to-transparent opacity-50 blur-3xl pointer-events-none"
             />
         </div>
     );

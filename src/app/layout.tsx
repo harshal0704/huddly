@@ -68,14 +68,14 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className="dark">
+      <html lang="en">
         <head>
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
           />
         </head>
-        <body className={`${inter.variable} antialiased bg-[#030014] text-white`}>
+        <body className={`${inter.variable} antialiased`}>
           {children}
         </body>
       </html>
