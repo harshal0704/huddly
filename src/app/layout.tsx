@@ -12,17 +12,21 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Huddly — Walk up. Talk naturally.",
   description:
-    "The friendliest 3D virtual world for classrooms, offices, and communities. Walk up to anyone — video and audio start instantly. No awkward meeting links ever.",
+    "The friendliest interactive 3D virtual world for classrooms, offices, and communities. Walk up to anyone — video and audio start instantly.",
   keywords: [
-    "virtual office",
-    "3D virtual world",
+    "harshalsp",
+    "harshal patel dev",
+    "interactive 3D world",
+    "virtual office software",
+    "spatial chat",
     "gather.town alternative",
     "remote work",
     "virtual classroom",
     "proximity chat",
-    "spatial audio",
     "metaverse",
   ],
+  authors: [{ name: "Harshal Patel Dev", url: "https://harshalsp.vercel.app" }],
+  creator: "harshalsp",
   openGraph: {
     title: "Huddly — Walk up. Talk naturally.",
     description:
@@ -38,7 +42,23 @@ export const metadata: Metadata = {
     description:
       "The friendliest 3D virtual world. No awkward meeting links ever.",
   },
+  verification: {
+    google: "vPdZ1rzMuka8gCZFKRMek5HX04b9Eu4VWJv7tSzcyQg",
+  },
   robots: "index, follow",
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Huddly",
+  url: "https://huddly.app",
+  author: {
+    "@type": "Person",
+    name: "Harshal Patel Dev",
+    url: "https://harshalsp.vercel.app"
+  },
+  description: "The friendliest interactive 3D virtual world for classrooms, offices, and communities."
 };
 
 export default function RootLayout({
@@ -48,8 +68,14 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className="dark">
-        <body className={`${inter.variable} antialiased bg-[#030014] text-white`}>
+      <html lang="en">
+        <head>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+        </head>
+        <body className={`${inter.variable} antialiased`}>
           {children}
         </body>
       </html>
