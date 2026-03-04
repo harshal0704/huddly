@@ -5,9 +5,9 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { MousePointerClick, Users, Sparkles } from "lucide-react";
 
 const STEPS = [
-    { icon: MousePointerClick, number: "01", title: "Create your space", description: "Pick a template or start blank. Drop in furniture — make it yours.", gradient: "from-purple-500 to-violet-600", color: "#7c3aed" },
-    { icon: Users, number: "02", title: "Share the link", description: "No downloads, no installs. People join instantly in their browser.", gradient: "from-cyan-500 to-teal-600", color: "#06b6d4" },
-    { icon: Sparkles, number: "03", title: "Walk up & talk", description: "Move near someone — video and audio start. Walk away, it stops.", gradient: "from-blue-500 to-indigo-600", color: "#3b82f6" },
+    { icon: MousePointerClick, number: "01", title: "Enter the office", description: "Walk into the 3D office. Customize your avatar and pick a zone.", gradient: "from-emerald-600 to-teal-700", color: "#2D6A4F" },
+    { icon: Users, number: "02", title: "Share the link", description: "No downloads, no installs. People join instantly in their browser.", gradient: "from-amber-600 to-orange-700", color: "#D4A373" },
+    { icon: Sparkles, number: "03", title: "Walk up & talk", description: "Move near someone — video and audio start. Walk away, it stops.", gradient: "from-teal-500 to-emerald-600", color: "#52B788" },
 ];
 
 export default function HowItWorks() {
@@ -28,19 +28,19 @@ export default function HowItWorks() {
                     viewport={{ once: true }}
                     className="text-center mb-14"
                 >
-                    <span className="inline-block px-3 py-1 rounded-full bg-blue-500/8 border border-blue-500/15 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-4">
+                    <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold uppercase tracking-wider mb-4">
                         How it works
                     </span>
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 mb-4">
                         Three steps to{" "}
-                        <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">togetherness</span>
+                        <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">togetherness</span>
                     </h2>
                 </motion.div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
                     <svg className="hidden md:block absolute top-16 left-[15%] h-4 z-0" viewBox="0 0 700 20" preserveAspectRatio="none" style={{ width: "70%" }}>
                         <motion.path d="M0,10 C175,10 175,10 350,10 C525,10 525,10 700,10" fill="none" strokeWidth="2" stroke="url(#pg)" strokeDasharray="8 6" style={{ pathLength }} />
-                        <defs><linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#7c3aed" /><stop offset="50%" stopColor="#06b6d4" /><stop offset="100%" stopColor="#3b82f6" /></linearGradient></defs>
+                        <defs><linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#2D6A4F" /><stop offset="50%" stopColor="#D4A373" /><stop offset="100%" stopColor="#52B788" /></linearGradient></defs>
                     </svg>
 
                     {STEPS.map((step, i) => (

@@ -1,1060 +1,1076 @@
 "use client";
 
-import React, { useRef, useMemo, useEffect, useCallback, useState } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import {
-  OrbitControls,
-  Stars,
-  Text,
-  RoundedBox,
-  MeshReflectorMaterial,
-  Float,
-  Sparkles,
-  Sky,
-} from "@react-three/drei";
+import { Text, RoundedBox, Float, Sparkles, Sky, Html, PointerLockControls, Billboard } from "@react-three/drei";
 import * as THREE from "three";
+import { useRealtimeStore } from "@/stores/realtimeStore";
+import { useTracks, ParticipantTile } from "@livekit/components-react";
+import { Track } from "livekit-client";
 
-// ─── Types ───────────────────────────────────────────────────────
-type RoomTemplate = "classroom" | "office" | "cafe" | "conference" | "party" | "library" | "gaming" | "rooftop" | "theater";
-
+/* ═══════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════ */
 interface ThreeRoomProps {
-  template?: RoomTemplate;
-  roomName?: string;
-  broadcastStream?: MediaStream | null;
-  onBroadcast?: () => void;
+  roomId: string;
+  userName?: string;
+  template?: string; // e.g. "office", "cafe", "party"
 }
 
-// ─── Colour Palettes Per Template ────────────────────────────────
-const PALETTES: Record<RoomTemplate, { primary: string; accent: string; floor: string; wall: string; emissive: string }> = {
-  classroom: { primary: "#7c3aed", accent: "#a78bfa", floor: "#08041a", wall: "#1a0a3e", emissive: "#c4b5fd" },
-  office: { primary: "#0891b2", accent: "#22d3ee", floor: "#041318", wall: "#0c2d3a", emissive: "#67e8f9" },
-  cafe: { primary: "#d97706", accent: "#fbbf24", floor: "#120c04", wall: "#3d2200", emissive: "#fde68a" },
-  conference: { primary: "#7c3aed", accent: "#c4b5fd", floor: "#06031a", wall: "#200d50", emissive: "#ddd6fe" },
-  party: { primary: "#db2777", accent: "#f472b6", floor: "#140610", wall: "#3b0a28", emissive: "#fbcfe8" },
-  library: { primary: "#b45309", accent: "#f59e0b", floor: "#0e0a04", wall: "#332000", emissive: "#fcd34d" },
-  gaming: { primary: "#0891b2", accent: "#06b6d4", floor: "#040e12", wall: "#082830", emissive: "#22d3ee" },
-  rooftop: { primary: "#65a30d", accent: "#a3e635", floor: "#080e04", wall: "#1a3008", emissive: "#d9f99d" },
-  theater: { primary: "#dc2626", accent: "#f87171", floor: "#120404", wall: "#350a0a", emissive: "#fecaca" },
-};
-
-// ─── AABB Collision Box ──────────────────────────────────────────
 interface AABB { minX: number; maxX: number; minZ: number; maxZ: number; }
 
-function makeAABB(cx: number, cz: number, hw: number, hd: number): AABB {
-  return { minX: cx - hw, maxX: cx + hw, minZ: cz - hd, maxZ: cz + hd };
-}
+/* ═══════════════════════════════════════════════════════════════
+   OFFICE PALETTE
+   ═══════════════════════════════════════════════════════════════ */
+const P = {
+  floor: "#d4cfc4",
+  wall: "#e8e0d0",
+  desk: "#8B6B4A",
+  deskTop: "#a07e5a",
+  chair: "#3d8b6a",
+  glass: "#a8dfc8",
+  accent: "#E9C46A",
+  warmLight: "#D4A373",
+  neon: "#E9C46A",
+  skin: "#f0d5b8",
+  green: "#3d8b6a",
+  greenLight: "#6ecfa0",
+  cream: "#3a3a3a",
+};
 
-function checkCollision(x: number, z: number, boxes: AABB[], radius = 0.35): boolean {
-  for (const b of boxes) {
-    if (x + radius > b.minX && x - radius < b.maxX && z + radius > b.minZ && z - radius < b.maxZ) return true;
+/* ═══════════════════════════════════════════════════════════════
+   ZONE DEFINITIONS
+   ═══════════════════════════════════════════════════════════════ */
+const ZONES: { name: string; emoji: string; bounds: AABB; color: string }[] = [
+  { name: "Lobby", emoji: "🏛️", bounds: { minX: -28, maxX: 28, minZ: 20, maxZ: 28 }, color: P.warmLight },
+  { name: "Workspace", emoji: "🖥️", bounds: { minX: -18, maxX: 18, minZ: 2, maxZ: 18 }, color: P.desk },
+  { name: "Meeting Room 1", emoji: "📹", bounds: { minX: -28, maxX: -20, minZ: -8, maxZ: 0 }, color: P.glass },
+  { name: "Meeting Room 2", emoji: "📹", bounds: { minX: -10, maxX: 10, minZ: -10, maxZ: -2 }, color: P.glass },
+  { name: "Meeting Room 3", emoji: "📹", bounds: { minX: 20, maxX: 28, minZ: -8, maxZ: 0 }, color: P.glass },
+  { name: "Café", emoji: "☕", bounds: { minX: -28, maxX: -20, minZ: 2, maxZ: 18 }, color: P.warmLight },
+  { name: "Stage", emoji: "🎤", bounds: { minX: -10, maxX: 10, minZ: -24, maxZ: -12 }, color: P.green },
+  { name: "Library", emoji: "📖", bounds: { minX: -28, maxX: -14, minZ: -24, maxZ: -12 }, color: "#8B6914" },
+  { name: "Gaming", emoji: "🎮", bounds: { minX: 14, maxX: 28, minZ: -24, maxZ: -12 }, color: "#06b6d4" },
+  { name: "Rooftop", emoji: "🌳", bounds: { minX: -28, maxX: 28, minZ: -28, maxZ: -26 }, color: P.greenLight },
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   UNIFIED COLLIDERS
+   ═══════════════════════════════════════════════════════════════ */
+const COLLIDERS: AABB[] = [
+  // Outer walls
+  { minX: -30, maxX: 30, minZ: 29, maxZ: 30 },  // north wall
+  { minX: -30, maxX: 30, minZ: -30, maxZ: -29 }, // south wall
+  { minX: -30, maxX: -29, minZ: -30, maxZ: 30 }, // west wall
+  { minX: 29, maxX: 30, minZ: -30, maxZ: 30 },   // east wall
+  // Meeting room 1 walls
+  { minX: -28, maxX: -20, minZ: -0.2, maxZ: 0.2 },
+  { minX: -20.2, maxX: -19.8, minZ: -8, maxZ: 0 },
+  // Meeting room 2 walls
+  { minX: -10.2, maxX: -9.8, minZ: -10, maxZ: -2 },
+  { minX: 9.8, maxX: 10.2, minZ: -10, maxZ: -2 },
+  { minX: -10, maxX: 10, minZ: -10.2, maxZ: -9.8 },
+  // Meeting room 3 walls
+  { minX: 20, maxX: 28, minZ: -0.2, maxZ: 0.2 },
+  { minX: 19.8, maxX: 20.2, minZ: -8, maxZ: 0 },
+  // Desk pods (simplified)
+  { minX: -16, maxX: -8, minZ: 6, maxZ: 6.8 },
+  { minX: -4, maxX: 4, minZ: 6, maxZ: 6.8 },
+  { minX: 8, maxX: 16, minZ: 6, maxZ: 6.8 },
+  { minX: -16, maxX: -8, minZ: 12, maxZ: 12.8 },
+  { minX: -4, maxX: 4, minZ: 12, maxZ: 12.8 },
+  { minX: 8, maxX: 16, minZ: 12, maxZ: 12.8 },
+  // Café counter
+  { minX: -27, maxX: -22, minZ: 9.5, maxZ: 10.5 },
+  // Stage platform edge
+  { minX: -6, maxX: 6, minZ: -20, maxZ: -19.8 },
+  // Reception desk
+  { minX: -4, maxX: 4, minZ: 22, maxZ: 23.5 },
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   COLLISION HELPER
+   ═══════════════════════════════════════════════════════════════ */
+function wouldCollide(x: number, z: number, r: number = 0.4): boolean {
+  for (const c of COLLIDERS) {
+    if (x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ) return true;
   }
   return false;
 }
 
-// Per-template collision boxes (walls + major furniture)
-const ROOM_COLLIDERS: Record<RoomTemplate, AABB[]> = {
-  classroom: [
-    makeAABB(0, -12, 12, 0.2), makeAABB(-12, 0, 0.2, 12), makeAABB(12, 0, 0.2, 12), // walls
-    ...Array.from({ length: 3 }, (_, r) => Array.from({ length: 4 }, (_, c) => makeAABB((c - 1.5) * 3, r * 3 + 1, 1, 0.5))).flat(), // desks
-    makeAABB(0, -7, 1, 0.5), // teacher desk
-  ],
-  office: [
-    makeAABB(0, -10, 10, 0.2), makeAABB(-10, 0, 0.2, 10), makeAABB(10, 0, 0.2, 10),
-    ...([[-4, -3], [-4, 0], [-4, 3], [4, -3], [4, 0], [4, 3]] as [number, number][]).map(([x, z]) => makeAABB(x, z, 1, 0.5)),
-    makeAABB(0, 6, 1, 0.4), // sofa
-  ],
-  cafe: [
-    makeAABB(0, -8, 8, 0.2), makeAABB(-8, 0, 0.2, 8), makeAABB(8, 0, 0.2, 8),
-    makeAABB(0, -6, 4, 0.4), // bar counter
-    ...[[-4, 0], [0, 2], [4, 0], [-3, 5], [3, 5]].map(([x, z]) => makeAABB(x, z, 0.5, 0.5)),
-  ],
-  conference: [
-    makeAABB(0, -14, 14, 0.2), makeAABB(-14, 0, 0.2, 14), makeAABB(14, 0, 0.2, 14),
-    makeAABB(0, -8, 7, 3), // stage
-  ],
-  party: [
-    makeAABB(0, -12, 12, 0.2), makeAABB(-12, 0, 0.2, 12), makeAABB(12, 0, 0.2, 12),
-    makeAABB(0, -9, 1.5, 0.75), // DJ booth
-    makeAABB(-8, 4, 1, 0.4), makeAABB(8, 4, 1, 0.4), // sofas
-  ],
-  library: [
-    makeAABB(0, -10, 10, 0.2), makeAABB(-10, 0, 0.2, 10), makeAABB(10, 0, 0.2, 10),
-    ...[-7, -4.5, -2, 0.5, 3, 5.5, 8].map(x => makeAABB(x, -9.3, 0.75, 0.2)),
-    ...[-6, -3, 0, 3, 6].map(z => makeAABB(-9.3, z, 0.2, 0.75)),
-    ...[[-1.5, 2], [1.5, 2], [-1.5, 5], [1.5, 5]].map(([x, z]) => makeAABB(x, z, 1, 0.5)),
-  ],
-  gaming: [
-    makeAABB(0, -10, 10, 0.2), makeAABB(-10, 0, 0.2, 10), makeAABB(10, 0, 0.2, 10),
-    ...[[-6, -4], [-3, -4], [0, -4], [3, -4], [6, -4]].map(([x, z]) => makeAABB(x, z, 1, 0.5)),
-    makeAABB(9.2, 0, 1, 0.25), // trophy case
-  ],
-  rooftop: [
-    makeAABB(0, -10, 10, 0.1), makeAABB(-10, 0, 0.1, 10), makeAABB(10, 0, 0.1, 10), makeAABB(0, 10, 10, 0.1),
-    ...[[-7, -5], [-7, 0], [-7, 5], [7, -5], [7, 0], [7, 5]].map(([x, z]) => makeAABB(x, z, 0.75, 0.4)),
-  ],
-  theater: [
-    makeAABB(0, -14, 14, 0.2), makeAABB(-14, 0, 0.2, 14), makeAABB(14, 0, 0.2, 14),
-  ],
-};
-
-// ─── WASD Keyboard State Hook ────────────────────────────────────
-function useKeyboard() {
-  const keys = useRef<Record<string, boolean>>({});
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = true; };
-    const up = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = false; };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
-  }, []);
-  return keys;
+function getZone(x: number, z: number): string {
+  for (const z2 of ZONES) {
+    if (x >= z2.bounds.minX && x <= z2.bounds.maxX && z >= z2.bounds.minZ && z <= z2.bounds.maxZ) return z2.name;
+  }
+  return "Office";
 }
 
-// ─── Neon Strip ──────────────────────────────────────────────────
-function NeonStrip({ start, end, color }: { start: [number, number, number]; end: [number, number, number]; color: string }) {
-  const obj = useMemo(() => {
-    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...start), new THREE.Vector3(...end)]);
-    return new THREE.Line(g, new THREE.LineBasicMaterial({ color, linewidth: 2 }));
-  }, [start, end, color]);
-  return <primitive object={obj} />;
-}
+/* ═══════════════════════════════════════════════════════════════
+   BASIC 3D COMPONENTS
+   ═══════════════════════════════════════════════════════════════ */
 
-// ─── Reflective Floor ────────────────────────────────────────────
-function ReflectiveFloor({ color }: { color: string }) {
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-      <planeGeometry args={[80, 80]} />
-      <MeshReflectorMaterial
-        blur={[300, 100]} resolution={1024} mixBlur={1} mixStrength={40}
-        roughness={1} depthScale={1.2} minDepthThreshold={0.4} maxDepthThreshold={1.4}
-        color={color} metalness={0.5} mirror={0.5}
-      />
-    </mesh>
-  );
-}
-
-// ─── Floor Grid ──────────────────────────────────────────────────
-function FloorGrid({ color }: { color: string }) {
-  return <gridHelper args={[80, 80, color, color]} position={[0, 0.01, 0]} material-opacity={0.07} material-transparent={true} />;
-}
-
-// ─── Wall Panel ──────────────────────────────────────────────────
-function WallPanel({ position, size, color, emissiveColor }: {
-  position: [number, number, number]; size: [number, number, number]; color: string; emissiveColor: string;
-}) {
-  return (
-    <RoundedBox args={size} position={position} radius={0.05} smoothness={4} castShadow receiveShadow>
-      <meshStandardMaterial color={color} emissive={emissiveColor} emissiveIntensity={0.03} roughness={0.6} metalness={0.3} />
-    </RoundedBox>
-  );
-}
-
-// ─── Live Broadcast Screen (shows webcam/screenshare when active) ─
-function LiveBroadcastScreen({ position, rotation = [0, 0, 0], size = [6, 3.5, 0.15], playerRef, stream, onActivate }: {
-  position: [number, number, number]; rotation?: [number, number, number]; size?: [number, number, number];
-  playerRef: React.RefObject<THREE.Vector3>; stream?: MediaStream | null; onActivate?: () => void;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const textureRef = useRef<THREE.CanvasTexture | null>(null);
-  const [near, setNear] = useState(false);
-  const [broadcasting, setBroadcasting] = useState(false);
-
-  // Create video element for stream
-  useEffect(() => {
-    if (stream && stream.active) {
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-      video.play().catch(() => { });
-      videoRef.current = video;
-      setBroadcasting(true);
-      return () => {
-        video.pause();
-        video.srcObject = null;
-        videoRef.current = null;
-        setBroadcasting(false);
-      };
-    } else {
-      setBroadcasting(false);
-    }
-  }, [stream]);
-
-  useFrame((s) => {
-    // Pulse emissive when idle
-    if (meshRef.current && !broadcasting) {
-      (meshRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.5 + Math.sin(s.clock.elapsedTime * 0.5) * 0.15;
-    }
-    // Update video texture
-    if (broadcasting && videoRef.current && meshRef.current) {
-      if (!textureRef.current) {
-        const canvas = document.createElement("canvas");
-        canvas.width = 640;
-        canvas.height = 360;
-        textureRef.current = new THREE.CanvasTexture(canvas);
-      }
-      const ctx = textureRef.current.image.getContext("2d");
-      if (ctx && videoRef.current.readyState >= 2) {
-        ctx.drawImage(videoRef.current, 0, 0, 640, 360);
-        textureRef.current.needsUpdate = true;
-        (meshRef.current.material as THREE.MeshStandardMaterial).map = textureRef.current;
-        (meshRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.1;
-        (meshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
-      }
-    }
-    // Proximity check
-    if (playerRef.current) {
-      const d = new THREE.Vector3(position[0], 0, position[2]).distanceTo(
-        new THREE.Vector3(playerRef.current.x, 0, playerRef.current.z)
-      );
-      setNear(d < 5);
-    }
-  });
-
-  const handleClick = () => {
-    if (near && onActivate) onActivate();
-  };
-
+function Desk({ position, rotation = [0, 0, 0] as [number, number, number] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
   return (
     <group position={position} rotation={rotation}>
-      {/* Frame */}
-      <RoundedBox args={[size[0] + 0.3, size[1] + 0.3, 0.1]} radius={0.08} smoothness={4}>
-        <meshStandardMaterial color={broadcasting ? "#1a1a2e" : "#111"} metalness={0.8} roughness={0.2}
-          emissive={broadcasting ? "#7c3aed" : "#000"} emissiveIntensity={broadcasting ? 0.1 : 0} />
-      </RoundedBox>
-      {/* Screen surface */}
-      <mesh ref={meshRef} position={[0, 0, 0.08]} onClick={handleClick}>
-        <planeGeometry args={[size[0], size[1]]} />
-        <meshStandardMaterial color={broadcasting ? "#fff" : "#0a0520"}
-          emissive={broadcasting ? "#000" : "#7c3aed"} emissiveIntensity={0.5}
-          roughness={0.1} metalness={broadcasting ? 0.1 : 0.9} />
-      </mesh>
-      {/* Label */}
-      {!broadcasting && (
-        <Text position={[0, 0, 0.12]} fontSize={0.35} color="#c4b5fd" anchorX="center" anchorY="middle" fillOpacity={0.9}>
-          {"🎥  BROADCAST LIVE"}
-        </Text>
-      )}
-      {broadcasting && (
-        <Text position={[0, size[1] / 2 + 0.3, 0.08]} fontSize={0.2} color="#ef4444" anchorX="center" fillOpacity={0.95}>
-          {"● LIVE"}
-        </Text>
-      )}
-      {/* Proximity prompt */}
-      {near && !broadcasting && (
-        <group position={[0, -(size[1] / 2) - 0.8, 0.1]}>
-          <Text fontSize={0.22} color="#22d3ee" anchorX="center" fillOpacity={0.9} outlineWidth={0.01} outlineColor="#000">
-            Click to Start Broadcasting
-          </Text>
-          <mesh position={[0, -0.01, -0.05]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.5, 2, 32]} />
-            <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.4} transparent opacity={0.12} side={THREE.DoubleSide} />
-          </mesh>
-        </group>
-      )}
-      {/* Stand */}
-      <mesh position={[0, -(size[1] / 2) - 0.6, -0.05]}>
-        <cylinderGeometry args={[0.08, 0.12, 1.2, 16]} />
-        <meshStandardMaterial color="#222" metalness={0.9} roughness={0.1} />
-      </mesh>
-    </group>
-  );
-}
-
-// ─── Wall Art (decorative frame) ─────────────────────────────────
-function WallArt({ position, color = "#7c3aed", rotation = [0, 0, 0] }: {
-  position: [number, number, number]; color?: string; rotation?: [number, number, number];
-}) {
-  return (
-    <group position={position} rotation={rotation}>
-      <RoundedBox args={[1.5, 1, 0.06]} radius={0.03} smoothness={4}>
-        <meshStandardMaterial color="#111" metalness={0.6} roughness={0.3} />
-      </RoundedBox>
-      <RoundedBox args={[1.3, 0.8, 0.02]} position={[0, 0, 0.04]} radius={0.02} smoothness={4}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.06} roughness={0.4} metalness={0.4} />
-      </RoundedBox>
-    </group>
-  );
-}
-
-// ─── Area Rug ────────────────────────────────────────────────────
-function AreaRug({ position, size = [4, 3], color = "#2d1b69" }: {
-  position: [number, number, number]; size?: [number, number]; color?: string;
-}) {
-  return (
-    <mesh position={[position[0], 0.02, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={size} />
-      <meshStandardMaterial color={color} roughness={0.95} metalness={0} side={THREE.FrontSide} />
-    </mesh>
-  );
-}
-
-// ─── Wall Clock ──────────────────────────────────────────────────
-function WallClock({ position, color = "#c4b5fd" }: { position: [number, number, number]; color?: string }) {
-  const handRef = useRef<THREE.Mesh>(null);
-  useFrame((s) => {
-    if (handRef.current) handRef.current.rotation.z = -s.clock.elapsedTime * 0.5;
-  });
-  return (
-    <group position={position}>
-      <mesh><circleGeometry args={[0.4, 32]} /><meshStandardMaterial color="#111" metalness={0.8} roughness={0.2} /></mesh>
-      <mesh position={[0, 0, 0.02]}><circleGeometry args={[0.35, 32]} /><meshStandardMaterial color="#0a0a0a" /></mesh>
-      <mesh ref={handRef} position={[0, 0, 0.04]}>
-        <boxGeometry args={[0.02, 0.25, 0.01]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[0, 0, 0.04]}>
-        <boxGeometry args={[0.015, 0.15, 0.01]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
-      </mesh>
-    </group>
-  );
-}
-
-// ─── Desk ────────────────────────────────────────────────────────
-function Desk({ position, color = "#334155" }: { position: [number, number, number]; color?: string }) {
-  return (
-    <group position={position}>
       <RoundedBox args={[2, 0.08, 1]} position={[0, 0.75, 0]} radius={0.02} smoothness={4} castShadow>
-        <meshStandardMaterial color={color} roughness={0.4} metalness={0.6} />
+        <meshStandardMaterial color={P.deskTop} roughness={0.4} metalness={0.3} />
       </RoundedBox>
-      {[[-0.85, 0.375, -0.4], [0.85, 0.375, -0.4], [-0.85, 0.375, 0.4], [0.85, 0.375, 0.4]].map((lp, i) => (
-        <mesh key={i} position={lp as [number, number, number]} castShadow>
-          <cylinderGeometry args={[0.03, 0.03, 0.75, 8]} />
-          <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.2} />
+      {[[-0.85, 0.37, -0.4], [0.85, 0.37, -0.4], [-0.85, 0.37, 0.4], [0.85, 0.37, 0.4]].map((p, i) => (
+        <mesh key={i} position={p as [number, number, number]}>
+          <cylinderGeometry args={[0.03, 0.03, 0.74, 6]} />
+          <meshStandardMaterial color="#333" metalness={0.8} />
         </mesh>
       ))}
-      <group position={[0, 1.15, -0.2]}>
-        <RoundedBox args={[0.8, 0.5, 0.03]} radius={0.02} smoothness={4}>
-          <meshStandardMaterial color="#0a0a0a" emissive="#7c3aed" emissiveIntensity={0.2} />
-        </RoundedBox>
+      {/* Monitor */}
+      <RoundedBox args={[0.7, 0.5, 0.03]} position={[0, 1.1, -0.3]} radius={0.02} smoothness={4}>
+        <meshStandardMaterial color="#111" emissive={P.green} emissiveIntensity={0.08} />
+      </RoundedBox>
+    </group>
+  );
+}
+
+function StandingDesk({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <RoundedBox args={[1.4, 0.06, 0.7]} position={[0, 1.1, 0]} radius={0.02} smoothness={4} castShadow>
+        <meshStandardMaterial color={P.deskTop} roughness={0.4} metalness={0.3} />
+      </RoundedBox>
+      <mesh position={[-0.55, 0.55, 0]}><cylinderGeometry args={[0.04, 0.04, 1.1, 8]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
+      <mesh position={[0.55, 0.55, 0]}><cylinderGeometry args={[0.04, 0.04, 1.1, 8]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
+      <RoundedBox args={[0.5, 0.35, 0.025]} position={[0, 1.45, -0.2]} radius={0.02} smoothness={4}>
+        <meshStandardMaterial color="#111" emissive={P.green} emissiveIntensity={0.08} />
+      </RoundedBox>
+    </group>
+  );
+}
+
+function Chair({ position, color = P.chair }: { position: [number, number, number]; color?: string }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.45, 0]}><boxGeometry args={[0.5, 0.08, 0.5]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position={[0, 0.7, -0.22]}><boxGeometry args={[0.5, 0.5, 0.06]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position={[0, 0.22, 0]}><cylinderGeometry args={[0.03, 0.03, 0.44, 6]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
+    </group>
+  );
+}
+
+function GlassPartition({ position, size }: { position: [number, number, number]; size: [number, number, number] }) {
+  return (
+    <mesh position={position}>
+      <boxGeometry args={size} />
+      <meshStandardMaterial color={P.glass} transparent opacity={0.12} roughness={0.05} metalness={0.9} />
+    </mesh>
+  );
+}
+
+function ZoneLabel({ position, text, emoji }: { position: [number, number, number]; text: string; emoji: string }) {
+  return (
+    <Float speed={1.5} floatIntensity={0.15} rotationIntensity={0}>
+      <group position={position}>
+        <Text fontSize={0.4} color={P.cream} anchorX="center" fillOpacity={0.7}>{emoji} {text}</Text>
       </group>
-    </group>
+    </Float>
   );
 }
 
-// ─── Chair ───────────────────────────────────────────────────────
-function Chair({ position, color = "#4338ca" }: { position: [number, number, number]; color?: string }) {
-  return (
-    <group position={position}>
-      <RoundedBox args={[0.45, 0.06, 0.45]} position={[0, 0.45, 0]} radius={0.03} smoothness={4} castShadow>
-        <meshStandardMaterial color={color} roughness={0.5} />
-      </RoundedBox>
-      <RoundedBox args={[0.45, 0.5, 0.06]} position={[0, 0.73, -0.2]} radius={0.03} smoothness={4} castShadow>
-        <meshStandardMaterial color={color} roughness={0.5} />
-      </RoundedBox>
-      <mesh position={[0, 0.22, 0]}><cylinderGeometry args={[0.03, 0.03, 0.44, 8]} /><meshStandardMaterial color="#1e1b4b" metalness={0.8} /></mesh>
-    </group>
-  );
-}
-
-// ─── Auditorium Seats ────────────────────────────────────────────
-function AuditoriumSeats({ rows = 5, seatsPerRow = 8, color }: { rows?: number; seatsPerRow?: number; color: string }) {
-  const seats = useMemo(() => {
-    const r: { pos: [number, number, number] }[] = [];
-    for (let row = 0; row < rows; row++) for (let s = 0; s < seatsPerRow; s++) r.push({ pos: [(s - (seatsPerRow - 1) / 2) * 1.2, row * 0.4, 3 + row * 1.8] });
-    return r;
-  }, [rows, seatsPerRow]);
-  return (
-    <group>
-      {seats.map((s, i) => <Chair key={i} position={s.pos} color={color} />)}
-      {Array.from({ length: rows }).map((_, r) => (
-        <mesh key={r} position={[0, r * 0.4 - 0.02, 3 + r * 1.8]} receiveShadow>
-          <boxGeometry args={[seatsPerRow * 1.2 + 1, 0.04, 1.6]} />
-          <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-// ─── Sofa ────────────────────────────────────────────────────────
-function Sofa({ position, color = "#7c3aed", rotation = 0 }: { position: [number, number, number]; color?: string; rotation?: number }) {
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <RoundedBox args={[2, 0.4, 0.8]} position={[0, 0.3, 0]} radius={0.08} smoothness={4} castShadow><meshStandardMaterial color={color} roughness={0.7} /></RoundedBox>
-      <RoundedBox args={[2, 0.6, 0.12]} position={[0, 0.55, -0.35]} radius={0.05} smoothness={4} castShadow><meshStandardMaterial color={color} roughness={0.7} /></RoundedBox>
-    </group>
-  );
-}
-
-// ─── Coffee Table ────────────────────────────────────────────────
-function CoffeeTable({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.35, 0]} castShadow><cylinderGeometry args={[0.5, 0.5, 0.04, 32]} /><meshStandardMaterial color="#92400e" roughness={0.3} metalness={0.5} /></mesh>
-      <mesh position={[0, 0.17, 0]}><cylinderGeometry args={[0.06, 0.06, 0.34, 8]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
-    </group>
-  );
-}
-
-// ─── Plant ───────────────────────────────────────────────────────
 function Plant({ position }: { position: [number, number, number] }) {
   return (
     <group position={position}>
-      <mesh position={[0, 0.25, 0]} castShadow><cylinderGeometry args={[0.15, 0.2, 0.5, 8]} /><meshStandardMaterial color="#44403c" roughness={0.8} /></mesh>
-      <Float speed={2} rotationIntensity={0.1} floatIntensity={0.3}>
-        <mesh position={[0, 0.7, 0]} castShadow><sphereGeometry args={[0.35, 16, 16]} /><meshStandardMaterial color="#166534" roughness={0.8} /></mesh>
+      <mesh position={[0, 0.2, 0]}><cylinderGeometry args={[0.12, 0.15, 0.4, 8]} /><meshStandardMaterial color="#44403c" roughness={0.8} /></mesh>
+      <Float speed={2} rotationIntensity={0.1} floatIntensity={0.15}>
+        <mesh position={[0, 0.55, 0]}><sphereGeometry args={[0.25, 12, 12]} /><meshStandardMaterial color="#166534" roughness={0.7} /></mesh>
       </Float>
     </group>
   );
 }
 
-// ─── Glow Pillar ─────────────────────────────────────────────────
-function GlowPillar({ position, color }: { position: [number, number, number]; color: string }) {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame((s) => { if (ref.current) (ref.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + Math.sin(s.clock.elapsedTime * 1.5 + position[0]) * 0.15; });
-  return (
-    <mesh ref={ref} position={position} castShadow>
-      <cylinderGeometry args={[0.15, 0.15, 4, 16]} />
-      <meshStandardMaterial color="#111" emissive={color} emissiveIntensity={0.3} roughness={0.1} metalness={0.9} />
-    </mesh>
-  );
-}
-
-// ─── Bookshelf ───────────────────────────────────────────────────
-function Bookshelf({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <RoundedBox args={[1.5, 3, 0.4]} position={[0, 1.5, 0]} radius={0.03} smoothness={4} castShadow>
-        <meshStandardMaterial color="#5c3a1e" roughness={0.7} metalness={0.2} />
-      </RoundedBox>
-      {[0.5, 1.1, 1.7, 2.3].map((y, i) => (
-        <RoundedBox key={i} args={[1.3, 0.06, 0.35]} position={[0, y, 0.01]} radius={0.01} smoothness={4}>
-          <meshStandardMaterial color="#4a2e14" roughness={0.8} />
-        </RoundedBox>
-      ))}
-      {/* Books */}
-      {[0.7, 1.3, 1.9].map((y, i) => (
-        <group key={`books-${i}`} position={[0, y, 0.05]}>
-          {[-0.4, -0.2, 0, 0.15, 0.35].map((x, j) => (
-            <mesh key={j} position={[x, 0, 0]}>
-              <boxGeometry args={[0.12, 0.3, 0.2]} />
-              <meshStandardMaterial color={["#8b5cf6", "#ef4444", "#3b82f6", "#10b981", "#f59e0b"][j]} roughness={0.7} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-    </group>
-  );
-}
-
-// ─── Reading Lamp ────────────────────────────────────────────────
-function ReadingLamp({ position }: { position: [number, number, number] }) {
+function WaterCooler({ position }: { position: [number, number, number] }) {
   return (
     <group position={position}>
-      <mesh position={[0, 0.5, 0]}><cylinderGeometry args={[0.02, 0.02, 1, 8]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
-      <mesh position={[0, 1, 0]}><coneGeometry args={[0.2, 0.25, 16]} /><meshStandardMaterial color="#d97706" emissive="#fbbf24" emissiveIntensity={0.4} /></mesh>
-      <pointLight position={position} intensity={0.3} color="#fbbf24" distance={4} />
+      <mesh position={[0, 0.5, 0]}><cylinderGeometry args={[0.2, 0.2, 1, 12]} /><meshStandardMaterial color="#e2e8f0" roughness={0.3} metalness={0.5} /></mesh>
+      <mesh position={[0, 1.15, 0]}><cylinderGeometry args={[0.22, 0.18, 0.3, 12]} /><meshStandardMaterial color="#93c5fd" transparent opacity={0.5} /></mesh>
     </group>
   );
 }
 
-// ─── Armchair ────────────────────────────────────────────────────
-function Armchair({ position, color = "#78350f", rotation = 0 }: { position: [number, number, number]; color?: string; rotation?: number }) {
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <RoundedBox args={[0.7, 0.35, 0.7]} position={[0, 0.3, 0]} radius={0.06} smoothness={4} castShadow>
-        <meshStandardMaterial color={color} roughness={0.8} />
-      </RoundedBox>
-      <RoundedBox args={[0.7, 0.5, 0.1]} position={[0, 0.55, -0.3]} radius={0.05} smoothness={4} castShadow>
-        <meshStandardMaterial color={color} roughness={0.8} />
-      </RoundedBox>
-      <RoundedBox args={[0.1, 0.3, 0.5]} position={[-0.35, 0.45, 0]} radius={0.04} smoothness={4} castShadow>
-        <meshStandardMaterial color={color} roughness={0.8} />
-      </RoundedBox>
-      <RoundedBox args={[0.1, 0.3, 0.5]} position={[0.35, 0.45, 0]} radius={0.04} smoothness={4} castShadow>
-        <meshStandardMaterial color={color} roughness={0.8} />
-      </RoundedBox>
-    </group>
-  );
-}
-
-// ─── Neon Sign ───────────────────────────────────────────────────
-function NeonSign({ position, text, color }: { position: [number, number, number]; text: string; color: string }) {
+function CoffeeMachine({ position }: { position: [number, number, number] }) {
   return (
     <group position={position}>
-      <Text fontSize={0.5} color={color} anchorX="center" anchorY="middle" fillOpacity={0.9} outlineWidth={0.02} outlineColor="#000">
-        {text}
-      </Text>
+      <RoundedBox args={[0.5, 0.7, 0.4]} position={[0, 0.35, 0]} radius={0.03} smoothness={4}>
+        <meshStandardMaterial color="#292524" roughness={0.3} metalness={0.6} />
+      </RoundedBox>
+      <mesh position={[0, 0.75, 0]}><cylinderGeometry args={[0.06, 0.08, 0.1, 8]} /><meshStandardMaterial color="#78350f" /></mesh>
     </group>
   );
 }
 
-// ─── String Lights (fairy lights) ────────────────────────────────
-function StringLights({ from, to, color = "#fbbf24", count = 10 }: { from: [number, number, number]; to: [number, number, number]; color?: string; count?: number }) {
-  const bulbs = useMemo(() => {
-    const result: [number, number, number][] = [];
-    for (let i = 0; i < count; i++) {
-      const t = i / (count - 1);
-      const x = from[0] + (to[0] - from[0]) * t;
-      const y = from[1] + (to[1] - from[1]) * t - Math.sin(t * Math.PI) * 0.5;
-      const z = from[2] + (to[2] - from[2]) * t;
-      result.push([x, y, z]);
-    }
-    return result;
-  }, [from, to, count]);
+function Bookshelf({ position, rotation = [0, 0, 0] as [number, number, number] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
   return (
-    <group>
-      {bulbs.map((pos, i) => (
-        <mesh key={i} position={pos}>
-          <sphereGeometry args={[0.06, 8, 8]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} />
+    <group position={position} rotation={rotation}>
+      <RoundedBox args={[1.2, 2.4, 0.35]} position={[0, 1.2, 0]} radius={0.02} smoothness={4}>
+        <meshStandardMaterial color="#5C3A1E" roughness={0.7} />
+      </RoundedBox>
+      {/* Book rows */}
+      {[0.4, 0.9, 1.4, 1.9].map((y, i) => (
+        <mesh key={i} position={[0, y, 0.02]}>
+          <boxGeometry args={[1, 0.3, 0.25]} />
+          <meshStandardMaterial color={["#991b1b", "#1e3a5f", "#365314", "#78350f"][i]} roughness={0.8} />
         </mesh>
       ))}
     </group>
   );
 }
 
-// ─── Proximity Ring ──────────────────────────────────────────────
-function ProximityRing({ position, color = "#fff", radius = 0.5, opacity = 0.2 }: { position: [number, number, number]; color?: string; radius?: number; opacity?: number }) {
+function ArcadeCabinet({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <RoundedBox args={[0.8, 1.8, 0.6]} position={[0, 0.9, 0]} radius={0.03} smoothness={4}>
+        <meshStandardMaterial color="#1a1a2e" roughness={0.4} metalness={0.5} />
+      </RoundedBox>
+      <mesh position={[0, 1.3, 0.31]}>
+        <planeGeometry args={[0.6, 0.5]} />
+        <meshStandardMaterial color="#000" emissive="#06b6d4" emissiveIntensity={0.6} />
+      </mesh>
+      <Text position={[0, 1.75, 0.32]} fontSize={0.1} color="#E9C46A" anchorX="center">ARCADE</Text>
+    </group>
+  );
+}
+
+function JukeBox({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <RoundedBox args={[0.7, 1.4, 0.5]} position={[0, 0.7, 0]} radius={0.05} smoothness={4}>
+        <meshStandardMaterial color="#78350f" roughness={0.5} metalness={0.4} />
+      </RoundedBox>
+      <mesh position={[0, 1.1, 0.26]}>
+        <planeGeometry args={[0.5, 0.4]} />
+        <meshStandardMaterial color="#000" emissive={P.neon} emissiveIntensity={0.5} />
+      </mesh>
+      <Text position={[0, 1.4, 0.3]} fontSize={0.08} color={P.neon} anchorX="center">♪ JUKEBOX ♪</Text>
+    </group>
+  );
+}
+
+function ScrumBoard({ position, rotation = [0, 0, 0] as [number, number, number] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <RoundedBox args={[3, 2, 0.08]} position={[0, 1.5, 0]} radius={0.02} smoothness={4}>
+        <meshStandardMaterial color="#f5f5f4" roughness={0.8} />
+      </RoundedBox>
+      {/* Sticky notes */}
+      {[[-0.8, 1.8], [-0.3, 1.3], [0.2, 1.7], [0.7, 1.4], [-0.5, 1.6], [0.5, 1.2]].map(([x, y], i) => (
+        <mesh key={i} position={[x, y, 0.05]}>
+          <planeGeometry args={[0.35, 0.3]} />
+          <meshStandardMaterial color={["#fef08a", "#bbf7d0", "#fecaca", "#bfdbfe", "#e9d5ff", "#fed7aa"][i]} />
+        </mesh>
+      ))}
+      <Text position={[-0.8, 2.35, 0.06]} fontSize={0.12} color="#333" anchorX="center">TODO</Text>
+      <Text position={[0, 2.35, 0.06]} fontSize={0.12} color="#333" anchorX="center">IN PROGRESS</Text>
+      <Text position={[0.8, 2.35, 0.06]} fontSize={0.12} color="#333" anchorX="center">DONE</Text>
+    </group>
+  );
+}
+
+function MeetingTable({ position, size = "small" }: { position: [number, number, number]; size?: "small" | "large" }) {
+  const w = size === "large" ? 4 : 2.5;
+  const d = size === "large" ? 2 : 1.5;
+  return (
+    <group position={position}>
+      <RoundedBox args={[w, 0.08, d]} position={[0, 0.75, 0]} radius={0.04} smoothness={4} castShadow>
+        <meshStandardMaterial color={P.deskTop} roughness={0.3} metalness={0.3} />
+      </RoundedBox>
+      <mesh position={[0, 0.37, 0]}><cylinderGeometry args={[0.15, 0.25, 0.74, 12]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
+    </group>
+  );
+}
+
+function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, number], size = [3, 1.8] }: { position: [number, number, number]; rotation?: [number, number, number]; size?: [number, number] }) {
   const ref = useRef<THREE.Mesh>(null);
+
+  const tracks = useTracks([
+    { source: Track.Source.ScreenShare, withPlaceholder: false },
+    { source: Track.Source.Camera, withPlaceholder: false }
+  ], { onlySubscribed: true });
+
+  const activeTrack = tracks.find(t => t.source === Track.Source.ScreenShare) || tracks[0];
+
   useFrame((s) => {
-    if (ref.current) {
-      ref.current.scale.setScalar(1 + Math.sin(s.clock.elapsedTime * 4) * 0.1);
-      (ref.current.material as THREE.MeshStandardMaterial).opacity = opacity + Math.sin(s.clock.elapsedTime * 4) * 0.05;
+    if (ref.current && !activeTrack) {
+      (ref.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + Math.sin(s.clock.elapsedTime * 0.5) * 0.1;
     }
   });
+
   return (
-    <mesh ref={ref} position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[radius * 0.8, radius, 32]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} transparent opacity={opacity} side={THREE.DoubleSide} />
+    <group position={position} rotation={rotation}>
+      <RoundedBox args={[size[0] + 0.2, size[1] + 0.15, 0.08]} radius={0.04} smoothness={4}>
+        <meshStandardMaterial color="#111" metalness={0.8} roughness={0.2} />
+      </RoundedBox>
+      <mesh ref={ref} position={[0, 0, 0.05]}>
+        <planeGeometry args={size} />
+        {activeTrack ? (
+          <meshBasicMaterial color="#000" />
+        ) : (
+          <meshStandardMaterial color="#0a1a10" emissive={P.green} emissiveIntensity={0.3} roughness={0.1} metalness={0.9} />
+        )}
+      </mesh>
+      {activeTrack && (
+        <Html position={[0, 0, 0.06]} transform distanceFactor={1.5} center zIndexRange={[100, 0]} style={{ width: `${size[0] * 200}px`, height: `${size[1] * 200}px` }}>
+          <div className="w-full h-full overflow-hidden [&>.lk-participant-tile]:w-full [&>.lk-participant-tile]:h-full [&>div>video]:object-cover" style={{ pointerEvents: 'none' }}>
+            <ParticipantTile trackRef={activeTrack} />
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+function NeonSign({ position, text, color = P.neon }: { position: [number, number, number]; text: string; color?: string }) {
+  return (
+    <Text position={position} fontSize={0.35} color={color} anchorX="center" fillOpacity={0.9}
+      outlineWidth={0.02} outlineColor={color} outlineOpacity={0.3}>
+      {text}
+    </Text>
+  );
+}
+
+function PendantLight({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0, 0]}><cylinderGeometry args={[0.01, 0.01, 0.5, 6]} /><meshStandardMaterial color="#333" /></mesh>
+      <mesh position={[0, -0.3, 0]}><coneGeometry args={[0.2, 0.15, 12]} /><meshStandardMaterial color={P.warmLight} emissive={P.warmLight} emissiveIntensity={0.3} /></mesh>
+      <pointLight position={[0, -0.4, 0]} intensity={0.4} color={P.warmLight} distance={4} />
+    </group>
+  );
+}
+
+function Sofa({ position, rotation = [0, 0, 0] as [number, number, number], color = P.chair }: { position: [number, number, number]; rotation?: [number, number, number]; color?: string }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <RoundedBox args={[2, 0.4, 0.8]} position={[0, 0.3, 0]} radius={0.06} smoothness={4}><meshStandardMaterial color={color} roughness={0.7} /></RoundedBox>
+      <RoundedBox args={[2, 0.6, 0.15]} position={[0, 0.5, -0.35]} radius={0.04} smoothness={4}><meshStandardMaterial color={color} roughness={0.7} /></RoundedBox>
+    </group>
+  );
+}
+
+function ReceptionDesk({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Main curved desk */}
+      <RoundedBox args={[6, 1.1, 1.2]} position={[0, 0.55, 0]} radius={0.06} smoothness={4} castShadow>
+        <meshStandardMaterial color={P.desk} roughness={0.5} metalness={0.3} />
+      </RoundedBox>
+      {/* Top surface */}
+      <RoundedBox args={[6.2, 0.06, 1.4]} position={[0, 1.12, 0]} radius={0.03} smoothness={4}>
+        <meshStandardMaterial color={P.deskTop} roughness={0.3} metalness={0.4} />
+      </RoundedBox>
+      {/* Monitor */}
+      <RoundedBox args={[1, 0.7, 0.04]} position={[0, 1.6, -0.3]} radius={0.02} smoothness={4}>
+        <meshStandardMaterial color="#111" emissive={P.green} emissiveIntensity={0.1} />
+      </RoundedBox>
+      {/* Huddly sign */}
+      <Text position={[0, 2.0, -0.3]} fontSize={0.25} color={P.greenLight} anchorX="center" fillOpacity={0.9}>
+        Welcome to Huddly Office
+      </Text>
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DELETED NPCS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+   AVATAR
+   ═══════════════════════════════════════════════════════════════ */
+function Avatar({ color, name }: { color: string; name: string }) {
+  return (
+    <group>
+      {/* ── Body (torso) */}
+      <mesh position={[0, -0.15, 0]} castShadow>
+        <capsuleGeometry args={[0.16, 0.35, 12, 12]} />
+        <meshStandardMaterial color={color} roughness={0.4} metalness={0.15} />
+      </mesh>
+      {/* ── Head */}
+      <mesh position={[0, 0.28, 0]} castShadow>
+        <sphereGeometry args={[0.18, 24, 24]} />
+        <meshStandardMaterial color={P.skin} roughness={0.3} />
+      </mesh>
+      {/* ── Hair/bun on top */}
+      <mesh position={[0, 0.42, -0.02]}>
+        <sphereGeometry args={[0.12, 16, 16]} />
+        <meshStandardMaterial color={color} roughness={0.6} />
+      </mesh>
+      {/* ── Eyes */}
+      <mesh position={[-0.06, 0.3, 0.15]}>
+        <sphereGeometry args={[0.025, 8, 8]} />
+        <meshStandardMaterial color="#222" />
+      </mesh>
+      <mesh position={[0.06, 0.3, 0.15]}>
+        <sphereGeometry args={[0.025, 8, 8]} />
+        <meshStandardMaterial color="#222" />
+      </mesh>
+      {/* ── Left arm */}
+      <mesh position={[-0.22, -0.12, 0]} rotation={[0, 0, 0.15]} castShadow>
+        <capsuleGeometry args={[0.05, 0.25, 8, 8]} />
+        <meshStandardMaterial color={color} roughness={0.4} />
+      </mesh>
+      {/* ── Right arm */}
+      <mesh position={[0.22, -0.12, 0]} rotation={[0, 0, -0.15]} castShadow>
+        <capsuleGeometry args={[0.05, 0.25, 8, 8]} />
+        <meshStandardMaterial color={color} roughness={0.4} />
+      </mesh>
+      {/* ── Left leg */}
+      <mesh position={[-0.08, -0.5, 0]} castShadow>
+        <capsuleGeometry args={[0.06, 0.2, 8, 8]} />
+        <meshStandardMaterial color="#2c3e50" roughness={0.5} />
+      </mesh>
+      {/* ── Right leg */}
+      <mesh position={[0.08, -0.5, 0]} castShadow>
+        <capsuleGeometry args={[0.06, 0.2, 8, 8]} />
+        <meshStandardMaterial color="#2c3e50" roughness={0.5} />
+      </mesh>
+      {/* ── Shoes */}
+      <mesh position={[-0.08, -0.65, 0.03]}>
+        <boxGeometry args={[0.1, 0.06, 0.16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.3} />
+      </mesh>
+      <mesh position={[0.08, -0.65, 0.03]}>
+        <boxGeometry args={[0.1, 0.06, 0.16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.3} />
+      </mesh>
+      {/* ── Proximity ring (glowing) */}
+      <mesh position={[0, -0.67, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.28, 0.38, 32]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      {/* ── Floating Name Billboard */}
+      <Billboard position={[0, 1.2, 0]} follow={true} lockX={false} lockY={false} lockZ={false}>
+        <mesh position={[0, 0, -0.01]}>
+          <planeGeometry args={[name.length * 0.15 + 0.6, 0.5]} />
+          <meshBasicMaterial color="#000" transparent opacity={0.5} depthTest={false} />
+        </mesh>
+        <Text fontSize={0.3} color="white" anchorX="center" anchorY="middle" fontWeight="bold" renderOrder={1}>
+          <meshBasicMaterial color="#ffffff" depthTest={false} transparent />
+          {name}
+        </Text>
+      </Billboard>
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHAIR POSITIONS (for sit detection)
+   ═══════════════════════════════════════════════════════════════ */
+const CHAIR_POSITIONS: [number, number][] = [
+  // Workspace pods (6 desks × 2 chairs each)
+  ...Array.from({ length: 6 }, (_, i) => {
+    const col = i % 3; const row = Math.floor(i / 3);
+    const x = -12 + col * 12; const z = 8 + row * 6;
+    return [[x - 1, z], [x + 1, z]] as [number, number][];
+  }).flat(),
+  // Meeting room 1 chairs
+  [-25, -4], [-23, -4], [-25, -6], [-23, -6],
+  // Meeting room 2 chairs
+  [-3, -6], [3, -6], [-3, -8], [3, -8], [-1, -6], [1, -6], [-1, -8], [1, -8],
+  // Meeting room 3 chairs
+  [23, -4], [25, -4], [23, -6], [25, -6],
+  // Café seats
+  [-26, 8], [-22, 8], [-26, 12], [-22, 12],
+  // Library sofas
+  [-18, -18], [-24, -18],
+  // Gaming desks
+  [18, -16], [20, -16], [22, -16], [24, -16], [26, -16],
+  // Stage audience
+  ...Array.from({ length: 15 }, (_, i) => [(-6 + Math.floor(i / 3) * 3), (-16 - (i % 3) * 2)] as [number, number]),
+  // Lobby sofas
+  [-8, 26], [8, 26],
+  // Rooftop benches
+  [-10, -28], [0, -28], [10, -28],
+];
+
+function PlayerController({ userName, onZoneChange, onNearChair }: { userName: string; onZoneChange: (z: string) => void; onNearChair: (near: boolean) => void }) {
+  const { camera } = useThree();
+  const ref = useRef<THREE.Group>(null);
+  const keys = useRef({ w: false, a: false, s: false, d: false, e: false });
+  const speed = 6;
+  const lastZone = useRef("Lobby");
+  const isSitting = useRef(false);
+  const lastNearChair = useRef(false);
+
+  const updatePosition = useRealtimeStore(s => s.updatePosition);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k in keys.current) (keys.current as any)[k] = true;
+      if (k === "e" && ref.current) {
+        const px = ref.current.position.x, pz = ref.current.position.z;
+        const nearSeat = CHAIR_POSITIONS.some(([cx, cz]) => Math.abs(px - cx) < 1.5 && Math.abs(pz - cz) < 1.5);
+        if (nearSeat) {
+          isSitting.current = !isSitting.current;
+          if (isSitting.current) ref.current.position.y = 0.3;
+          else ref.current.position.y = 0.6;
+        }
+      }
+    };
+    const up = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (k in keys.current) (keys.current as any)[k] = false; };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
+  }, []);
+
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+
+    // Check chair proximity for HUD
+    const px = ref.current.position.x, pz = ref.current.position.z;
+    const nearSeat = CHAIR_POSITIONS.some(([cx, cz]) => Math.abs(px - cx) < 1.5 && Math.abs(pz - cz) < 1.5);
+    if (nearSeat !== lastNearChair.current) { lastNearChair.current = nearSeat; onNearChair(nearSeat); }
+
+    if (!isSitting.current) {
+      const { w, a, s, d } = keys.current;
+      const direction = new THREE.Vector3();
+      const frontVector = new THREE.Vector3(0, 0, (s ? 1 : 0) - (w ? 1 : 0));
+      const sideVector = new THREE.Vector3((a ? 1 : 0) - (d ? 1 : 0), 0, 0);
+
+      direction.subVectors(frontVector, sideVector).normalize().multiplyScalar(speed * dt).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
+
+      const nx = ref.current.position.x - direction.x;
+      const nz = ref.current.position.z - direction.z;
+
+      const clampX = Math.max(-28, Math.min(28, nx));
+      const clampZ = Math.max(-28, Math.min(28, nz));
+
+      if (!wouldCollide(clampX, ref.current.position.z, 0.35)) ref.current.position.x = clampX;
+      if (!wouldCollide(ref.current.position.x, clampZ, 0.35)) ref.current.position.z = clampZ;
+    }
+
+    const zone = getZone(ref.current.position.x, ref.current.position.z);
+    if (zone !== lastZone.current) { lastZone.current = zone; onZoneChange(zone); }
+
+    // First person camera lock inside head
+    const targetCamPos = ref.current.position.clone();
+    targetCamPos.y += 1.4; // Eye-level (higher than before for true 1st person scale)
+    camera.position.lerp(targetCamPos, 0.3);
+
+    // Broadcast position randomly per frame (throttle) to avoid network flooding
+    if (Math.random() < 0.1) {
+      updatePosition(ref.current.position.x, ref.current.position.y, ref.current.position.z, lastZone.current);
+    }
+  });
+
+  return (
+    <group ref={ref} position={[0, 0.6, 24]}>
+      {/* Self avatar goes here but hidden for FPS to avoid clipping */}
+      <PointerLockControls makeDefault />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DECORATIVE COMPONENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+function ZoneRug({ position, size, color }: { position: [number, number, number]; size: [number, number]; color: string }) {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[position[0], 0.02, position[2]]} receiveShadow>
+      <planeGeometry args={size} />
+      <meshStandardMaterial color={color} roughness={0.95} metalness={0} />
     </mesh>
   );
 }
 
-// ─── 3D Avatar ───────────────────────────────────────────────────
-function Avatar({ position, name, bodyColor = "#7c3aed", headColor = "#f0edff" }: {
-  position: [number, number, number]; name: string; bodyColor?: string; headColor?: string;
-}) {
-  const group = useRef<THREE.Group>(null);
-  useFrame((s) => { if (group.current) group.current.position.y = position[1] + Math.sin(s.clock.elapsedTime * 2 + position[0]) * 0.06; });
+function FloorLamp({ position, lightColor = "#fff5e0" }: { position: [number, number, number]; lightColor?: string }) {
   return (
-    <group ref={group} position={position}>
-      <mesh position={[0, -0.4, 0]} castShadow><capsuleGeometry args={[0.25, 0.6, 16, 16]} /><meshStandardMaterial color={bodyColor} roughness={0.4} metalness={0.3} /></mesh>
-      <mesh position={[0, 0.35, 0]} castShadow><sphereGeometry args={[0.25, 32, 32]} /><meshStandardMaterial color={headColor} roughness={0.3} /></mesh>
-      <mesh position={[0, -0.7, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.3, 0.4, 32]} />
-        <meshStandardMaterial color={bodyColor} emissive={bodyColor} emissiveIntensity={0.5} transparent opacity={0.3} side={THREE.DoubleSide} />
-      </mesh>
-      <Text position={[0, 1, 0]} fontSize={0.15} color="white" anchorX="center" anchorY="bottom" fillOpacity={0.85} outlineWidth={0.01} outlineColor="#000">
-        {name}
-      </Text>
+    <group position={position}>
+      <mesh position={[0, 0.04, 0]}><cylinderGeometry args={[0.15, 0.18, 0.08, 12]} /><meshStandardMaterial color="#444" metalness={0.7} /></mesh>
+      <mesh position={[0, 0.8, 0]}><cylinderGeometry args={[0.02, 0.02, 1.5, 8]} /><meshStandardMaterial color="#555" metalness={0.7} /></mesh>
+      <mesh position={[0, 1.6, 0]}><coneGeometry args={[0.22, 0.25, 12]} /><meshStandardMaterial color="#f5f0e0" emissive={lightColor} emissiveIntensity={0.3} /></mesh>
+      <pointLight position={[0, 1.55, 0]} intensity={0.5} color={lightColor} distance={6} />
     </group>
   );
 }
 
-// ─── Interactive Object (glows when player is near, clickable) ───
-function InteractiveObject({ position, label, color = "#7c3aed", playerRef, children }: {
-  position: [number, number, number]; label: string; color?: string;
-  playerRef: React.RefObject<THREE.Vector3>; children: React.ReactNode;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-  const [near, setNear] = useState(false);
-  const [clicked, setClicked] = useState(false);
-
-  useFrame(() => {
-    if (!playerRef.current || !groupRef.current) return;
-    const d = new THREE.Vector3(...position).distanceTo(playerRef.current);
-    setNear(d < 3);
-  });
-
+function WallPoster({ position, rotation = [0, 0, 0] as [number, number, number], color, text }: { position: [number, number, number]; rotation?: [number, number, number]; color: string; text: string }) {
   return (
-    <group ref={groupRef} position={position} onClick={() => setClicked(c => !c)}>
-      {children}
-      {near && (
-        <>
-          <mesh position={[0, -0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.2, 1.5, 32]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} transparent opacity={0.2} side={THREE.DoubleSide} />
-          </mesh>
-          <Text position={[0, 2.5, 0]} fontSize={0.18} color="#fff" anchorX="center" anchorY="bottom" fillOpacity={0.9} outlineWidth={0.01} outlineColor="#000">
-            {clicked ? `✓ ${label}` : `● ${label}`}
-          </Text>
-        </>
-      )}
+    <group position={position} rotation={rotation}>
+      <mesh><boxGeometry args={[1.2, 0.9, 0.03]} /><meshStandardMaterial color={color} roughness={0.5} /></mesh>
+      <Text position={[0, 0, 0.02]} fontSize={0.1} color="white" anchorX="center" anchorY="middle" maxWidth={1}>{text}</Text>
     </group>
   );
 }
 
-// ─── Wandering NPC ───────────────────────────────────────────────
-function WanderingNPC({ name, bodyColor = "#3b82f6", startPos, bounds = 4, playerRef }: {
-  name: string; bodyColor?: string; startPos: [number, number, number];
-  bounds?: number; playerRef: React.RefObject<THREE.Vector3>;
-}) {
-  const group = useRef<THREE.Group>(null);
-  const target = useRef(new THREE.Vector3(startPos[0], startPos[1], startPos[2]));
-  const timer = useRef(0);
-  const [talking, setTalking] = useState(false);
-
-  useFrame((state, delta) => {
-    if (!group.current) return;
-    timer.current += delta;
-    // Pick new wander target every 3-6s
-    if (timer.current > 3 + Math.random() * 3) {
-      timer.current = 0;
-      target.current.set(
-        startPos[0] + (Math.random() - 0.5) * bounds * 2,
-        startPos[1],
-        startPos[2] + (Math.random() - 0.5) * bounds * 2
-      );
-    }
-    // Check proximity to player
-    if (playerRef.current) {
-      const d = group.current.position.distanceTo(playerRef.current);
-      setTalking(d < 3.5);
-      if (d < 3.5) {
-        // Face toward player
-        const dir = playerRef.current.clone().sub(group.current.position);
-        const angle = Math.atan2(dir.x, dir.z);
-        group.current.rotation.y += (angle - group.current.rotation.y) * 0.05;
-      }
-    }
-    // Move toward target
-    group.current.position.lerp(target.current, 0.01);
-    group.current.position.y = startPos[1] + Math.sin(state.clock.elapsedTime * 2 + startPos[0]) * 0.06;
-  });
-
+function WallClock({ position, rotation = [0, 0, 0] as [number, number, number] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
+  const handRef = useRef<THREE.Mesh>(null);
+  useFrame((s) => { if (handRef.current) handRef.current.rotation.z = -s.clock.elapsedTime * 0.5; });
   return (
-    <group ref={group} position={startPos}>
-      <mesh position={[0, -0.4, 0]} castShadow><capsuleGeometry args={[0.25, 0.6, 16, 16]} /><meshStandardMaterial color={bodyColor} roughness={0.4} metalness={0.3} /></mesh>
-      <mesh position={[0, 0.35, 0]} castShadow><sphereGeometry args={[0.25, 32, 32]} /><meshStandardMaterial color="#f0edff" roughness={0.3} /></mesh>
-      <mesh position={[0, -0.7, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.3, 0.4, 32]} />
-        <meshStandardMaterial color={bodyColor} emissive={bodyColor} emissiveIntensity={0.5} transparent opacity={0.3} side={THREE.DoubleSide} />
-      </mesh>
-      <Text position={[0, 1, 0]} fontSize={0.15} color="white" anchorX="center" anchorY="bottom" fillOpacity={0.85} outlineWidth={0.01} outlineColor="#000">
-        {name}
-      </Text>
-      {talking && (
-        <>
-          <mesh position={[0, -0.7, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.8, 1.0, 32]} />
-            <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.6} transparent opacity={0.25} side={THREE.DoubleSide} />
-          </mesh>
-          <Text position={[0, 1.3, 0]} fontSize={0.12} color="#22d3ee" anchorX="center" anchorY="bottom" fillOpacity={0.8}>
-            🎤 Nearby
-          </Text>
-        </>
-      )}
+    <group position={position} rotation={rotation}>
+      <mesh><circleGeometry args={[0.3, 32]} /><meshStandardMaterial color="#fff" roughness={0.4} /></mesh>
+      <mesh position={[0, 0, 0.01]}><ringGeometry args={[0.28, 0.3, 32]} /><meshStandardMaterial color="#333" /></mesh>
+      <mesh ref={handRef} position={[0, 0, 0.02]}><boxGeometry args={[0.02, 0.2, 0.01]} /><meshStandardMaterial color="#111" /></mesh>
     </group>
   );
 }
 
-// (ceiling removed — obstructed isometric camera view)
-
-// ─── Player Avatar (WASD controllable with collision) ────────────
-function PlayerAvatar({ keys, onPositionChange, colliders }: {
-  keys: React.RefObject<Record<string, boolean>>;
-  onPositionChange: (pos: THREE.Vector3) => void;
-  colliders: AABB[];
-}) {
-  const ref = useRef<THREE.Group>(null);
-  const pos = useRef(new THREE.Vector3(0, 0.6, 5));
-  const speed = 0.08;
-
-  useFrame(() => {
-    if (!keys.current || !ref.current) return;
-    const k = keys.current;
-    const dir = new THREE.Vector3();
-    if (k["w"] || k["arrowup"]) dir.z -= 1;
-    if (k["s"] || k["arrowdown"]) dir.z += 1;
-    if (k["a"] || k["arrowleft"]) dir.x -= 1;
-    if (k["d"] || k["arrowright"]) dir.x += 1;
-    if (dir.length() > 0) {
-      dir.normalize().multiplyScalar(speed);
-      const nextX = pos.current.x + dir.x;
-      const nextZ = pos.current.z + dir.z;
-      // Axis-separated collision: try X, then Z independently
-      if (!checkCollision(nextX, pos.current.z, colliders)) pos.current.x = nextX;
-      if (!checkCollision(pos.current.x, nextZ, colliders)) pos.current.z = nextZ;
-      // Hard boundary clamp
-      pos.current.x = Math.max(-15, Math.min(15, pos.current.x));
-      pos.current.z = Math.max(-15, Math.min(15, pos.current.z));
-    }
-    ref.current.position.lerp(pos.current, 0.15);
-    ref.current.position.y = 0.6 + Math.sin(Date.now() * 0.003) * 0.04;
-    onPositionChange(ref.current.position);
-  });
-
+function Whiteboard({ position, rotation = [0, 0, 0] as [number, number, number] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
   return (
-    <group ref={ref} position={[0, 0.6, 5]}>
-      <mesh position={[0, -0.4, 0]} castShadow><capsuleGeometry args={[0.25, 0.6, 16, 16]} /><meshStandardMaterial color="#7c3aed" roughness={0.4} metalness={0.3} /></mesh>
-      <mesh position={[0, 0.35, 0]} castShadow><sphereGeometry args={[0.25, 32, 32]} /><meshStandardMaterial color="#f0edff" roughness={0.3} /></mesh>
-      <mesh position={[0, -0.7, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.3, 0.45, 32]} />
-        <meshStandardMaterial color="#7c3aed" emissive="#7c3aed" emissiveIntensity={0.6} transparent opacity={0.4} side={THREE.DoubleSide} />
-      </mesh>
-      <Text position={[0, 1, 0]} fontSize={0.15} color="#fff" anchorX="center" anchorY="bottom" fillOpacity={0.9} outlineWidth={0.015} outlineColor="#000">
-        You
-      </Text>
-    </group>
-  );
-}
-
-// ─── Camera that follows player ──────────────────────────────────
-function FollowCamera({ target }: { target: React.RefObject<THREE.Vector3> }) {
-  const { camera } = useThree();
-  const offset = useMemo(() => new THREE.Vector3(0, 10, 14), []);
-
-  useFrame(() => {
-    if (!target.current) return;
-    const desired = target.current.clone().add(offset);
-    camera.position.lerp(desired, 0.04);
-    const lookTarget = target.current.clone();
-    lookTarget.y += 1;
-    camera.lookAt(lookTarget);
-  });
-
-  return null;
-}
-
-// ═══ Room Layouts ════════════════════════════════════════════════
-// Each layout is a self-contained component.
-
-function ClassroomLayout({ palette }: { palette: typeof PALETTES.classroom }) {
-  return (
-    <group>
-      <WallPanel position={[0, 2, -12]} size={[24, 4, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-12, 2, 0]} size={[0.3, 4, 24]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[12, 2, 0]} size={[0.3, 4, 24]} color={palette.wall} emissiveColor={palette.emissive} />
-      {/* Whiteboard */}
-      <RoundedBox args={[4, 2.5, 0.1]} position={[-6, 2.5, -11.5]} radius={0.05} smoothness={4}>
-        <meshStandardMaterial color="#1e1b4b" emissive="#c4b5fd" emissiveIntensity={0.02} roughness={0.4} metalness={0.3} />
+    <group position={position} rotation={rotation}>
+      <RoundedBox args={[2.5, 1.6, 0.06]} radius={0.03} smoothness={4}>
+        <meshStandardMaterial color="#fafafa" roughness={0.3} />
       </RoundedBox>
-      <Text position={[-6, 3.2, -11.3]} fontSize={0.2} color="#c4b5fd" anchorX="center" fillOpacity={0.6}>Whiteboard</Text>
-      {/* Desks & chairs */}
-      {Array.from({ length: 3 }).flatMap((_, r) => Array.from({ length: 4 }).map((_, c) => <Desk key={`d-${r}-${c}`} position={[(c - 1.5) * 3, 0, r * 3 + 1]} />))}
-      {Array.from({ length: 3 }).flatMap((_, r) => Array.from({ length: 4 }).map((_, c) => <Chair key={`c-${r}-${c}`} position={[(c - 1.5) * 3, 0, r * 3 + 1.7]} color={palette.primary} />))}
-      <Desk position={[0, 0, -7]} color="#4c1d95" />
-      {/* Decorations */}
-      <Plant position={[-10, 0, -10]} /><Plant position={[10, 0, -10]} /><Plant position={[-10, 0, 8]} /><Plant position={[10, 0, 8]} />
-      <WallClock position={[6, 3.2, -11.7]} color={palette.emissive} />
-      <WallArt position={[-10, 2.5, -11.7]} color={palette.primary} />
-      <WallArt position={[10, 2.5, -11.7]} color={palette.accent} />
-      <AreaRug position={[0, 0, -6.5]} size={[3, 2]} color="#1a0a3e" />
-      <NeonStrip start={[-12, 0.1, -12]} end={[12, 0.1, -12]} color={palette.accent} />
-      {/* NPCs */}
-      <Avatar position={[0, 1, -6]} name="Teacher" bodyColor="#7c3aed" headColor="#f5f3ff" />
-      <Avatar position={[-3, 1, 1.7]} name="Alex" bodyColor="#3b82f6" />
-      <Avatar position={[0, 1, 1.7]} name="Maya" bodyColor="#ec4899" />
-      <Avatar position={[3, 1, 1.7]} name="Sam" bodyColor="#10b981" />
-      <ProximityRing position={[-3, 0.05, 1.7]} color="#3b82f6" radius={1.2} opacity={0.15} />
-      <ProximityRing position={[0, 0.05, 1.7]} color="#ec4899" radius={1.2} opacity={0.15} />
-      <ProximityRing position={[3, 0.05, 1.7]} color="#10b981" radius={1.2} opacity={0.15} />
-    </group>
-  );
-}
-
-function OfficeLayout({ palette }: { palette: typeof PALETTES.office }) {
-  return (
-    <group>
-      <WallPanel position={[0, 2, -10]} size={[20, 4, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-10, 2, 0]} size={[0.3, 4, 20]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[10, 2, 0]} size={[0.3, 4, 20]} color={palette.wall} emissiveColor={palette.emissive} />
-      {[[-4, 0, -3], [-4, 0, 0], [-4, 0, 3], [4, 0, -3], [4, 0, 0], [4, 0, 3]].map((p, i) => <Desk key={i} position={p as [number, number, number]} color="#1e3a5f" />)}
-      <Sofa position={[0, 0, 6]} color="#1e40af" /><CoffeeTable position={[0, 0, 4.5]} />
-      <Plant position={[-8, 0, -8]} /><Plant position={[8, 0, -8]} /><Plant position={[-8, 0, 8]} /><Plant position={[8, 0, 8]} />
-      <GlowPillar position={[-9.5, 2, -9.5]} color={palette.emissive} /><GlowPillar position={[9.5, 2, -9.5]} color={palette.emissive} />
-      {/* Decorations */}
-      <WallClock position={[-5, 3, -9.7]} color={palette.emissive} />
-      <WallArt position={[5, 2.5, -9.7]} color={palette.accent} />
-      <AreaRug position={[0, 0, 5]} size={[4, 3]} color="#0c2d3a" />
-      <Avatar position={[-4, 1, -2.3]} name="Dev 1" bodyColor="#0891b2" /><Avatar position={[4, 1, 0.7]} name="Dev 2" bodyColor="#06b6d4" />
-      <ProximityRing position={[-4, 0.05, -2.3]} color="#0891b2" radius={1.5} opacity={0.12} />
-      <ProximityRing position={[4, 0.05, 0.7]} color="#06b6d4" radius={1.5} opacity={0.12} />
-    </group>
-  );
-}
-
-function ConferenceLayout({ palette }: { palette: typeof PALETTES.conference }) {
-  return (
-    <group>
-      <WallPanel position={[0, 2.5, -14]} size={[28, 5, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-14, 2.5, 0]} size={[0.3, 5, 28]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[14, 2.5, 0]} size={[0.3, 5, 28]} color={palette.wall} emissiveColor={palette.emissive} />
-      <mesh position={[0, 0.15, -8]} receiveShadow castShadow><boxGeometry args={[14, 0.3, 6]} /><meshStandardMaterial color="#1e1b4b" roughness={0.3} metalness={0.5} /></mesh>
-      <AuditoriumSeats rows={6} seatsPerRow={10} color={palette.primary} />
-      <GlowPillar position={[-6, 2, -10.5]} color="#a78bfa" /><GlowPillar position={[6, 2, -10.5]} color="#a78bfa" />
-      <Avatar position={[0, 1.3, -7]} name="Speaker" bodyColor="#7c3aed" headColor="#f5f3ff" />
-    </group>
-  );
-}
-
-function CafeLayout({ palette }: { palette: typeof PALETTES.cafe }) {
-  return (
-    <group>
-      <WallPanel position={[0, 2, -8]} size={[16, 4, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-8, 2, 0]} size={[0.3, 4, 16]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[8, 2, 0]} size={[0.3, 4, 16]} color={palette.wall} emissiveColor={palette.emissive} />
-      <RoundedBox args={[8, 1.1, 0.8]} position={[0, 0.55, -6]} radius={0.05} smoothness={4} castShadow><meshStandardMaterial color="#78350f" roughness={0.5} metalness={0.3} /></RoundedBox>
-      <Text position={[0, 3.4, -7.4]} fontSize={0.3} color="#fbbf24" anchorX="center">{"☕  HUDDLY CAFE  ☕"}</Text>
-      {[[-4, 0, 0], [0, 0, 2], [4, 0, 0], [-3, 0, 5], [3, 0, 5]].map((p, i) => (<group key={i}><CoffeeTable position={p as [number, number, number]} /><Chair position={[p[0] - 0.7, p[1], p[2] + 0.7]} color="#92400e" /><Chair position={[p[0] + 0.7, p[1], p[2] + 0.7]} color="#92400e" /></group>))}
-      <Sofa position={[-6, 0, 6]} color="#92400e" rotation={Math.PI / 4} />
-      <Plant position={[-7, 0, -7]} /><Plant position={[7, 0, -7]} /><Plant position={[0, 0, 7]} />
-      <AreaRug position={[0, 0, 2]} size={[5, 4]} color="#3d2200" />
-      <WallClock position={[7.5, 3, -7.7]} color={palette.emissive} />
-      <Avatar position={[-4, 1, 0.7]} name="Barista" bodyColor="#d97706" /><Avatar position={[0, 1, 2.7]} name="Alice" bodyColor="#f59e0b" />
-    </group>
-  );
-}
-
-function PartyLayout({ palette }: { palette: typeof PALETTES.party }) {
-  const danceColors = ["#ec4899", "#8b5cf6", "#06b6d4", "#f59e0b", "#10b981", "#ef4444"];
-  return (
-    <group>
-      <WallPanel position={[0, 2.5, -12]} size={[24, 5, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-12, 2.5, 0]} size={[0.3, 5, 24]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[12, 2.5, 0]} size={[0.3, 5, 24]} color={palette.wall} emissiveColor={palette.emissive} />
-      <RoundedBox args={[3, 1, 1.5]} position={[0, 0.5, -9]} radius={0.1} smoothness={4} castShadow><meshStandardMaterial color="#831843" emissive="#ec4899" emissiveIntensity={0.15} roughness={0.3} metalness={0.5} /></RoundedBox>
-      {Array.from({ length: 6 }).flatMap((_, r) => Array.from({ length: 6 }).map((_, c) => (
-        <mesh key={`t-${r}-${c}`} position={[(c - 2.5) * 1.5, 0.02, (r - 1) * 1.5]} receiveShadow>
-          <boxGeometry args={[1.4, 0.04, 1.4]} /><meshStandardMaterial color="#111" emissive={danceColors[(r + c) % 6]} emissiveIntensity={0.15} roughness={0.1} metalness={0.8} />
-        </mesh>
-      )))}
-      <Sofa position={[-8, 0, 4]} color="#be185d" rotation={Math.PI / 6} /><Sofa position={[8, 0, 4]} color="#9333ea" rotation={-Math.PI / 6} />
-      <GlowPillar position={[-11, 2, -11]} color="#ec4899" /><GlowPillar position={[11, 2, -11]} color="#8b5cf6" /><GlowPillar position={[-11, 2, 11]} color="#06b6d4" /><GlowPillar position={[11, 2, 11]} color="#f59e0b" />
-      <Avatar position={[0, 1, -8.5]} name="DJ" bodyColor="#ec4899" /><Avatar position={[-2, 1, 2]} name="Dancer" bodyColor="#8b5cf6" />
-    </group>
-  );
-}
-
-// ─── Library Layout ──────────────────────────────────────────────
-function LibraryLayout({ palette }: { palette: typeof PALETTES.library }) {
-  return (
-    <group>
-      <WallPanel position={[0, 2.5, -10]} size={[20, 5, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-10, 2.5, 0]} size={[0.3, 5, 20]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[10, 2.5, 0]} size={[0.3, 5, 20]} color={palette.wall} emissiveColor={palette.emissive} />
-      {/* Bookshelves along walls */}
-      {[-7, -4.5, -2, 0.5, 3, 5.5, 8].map((x, i) => <Bookshelf key={`bs-${i}`} position={[x, 0, -9.3]} />)}
-      {[-6, -3, 0, 3, 6].map((z, i) => <Bookshelf key={`bsl-${i}`} position={[-9.3, 0, z]} rotation={Math.PI / 2} />)}
-      {/* Reading nooks */}
-      <Armchair position={[-5, 0, 0]} color="#78350f" rotation={Math.PI / 4} />
-      <Armchair position={[-5, 0, 3]} color="#78350f" rotation={Math.PI / 6} />
-      <Armchair position={[5, 0, 0]} color="#92400e" rotation={-Math.PI / 4} />
-      <Armchair position={[5, 0, 3]} color="#92400e" rotation={-Math.PI / 6} />
-      {/* Central study tables */}
-      <Desk position={[-1.5, 0, 2]} color="#5c3a1e" /><Desk position={[1.5, 0, 2]} color="#5c3a1e" />
-      <Desk position={[-1.5, 0, 5]} color="#5c3a1e" /><Desk position={[1.5, 0, 5]} color="#5c3a1e" />
-      <Chair position={[-1.5, 0, 2.7]} color="#92400e" /><Chair position={[1.5, 0, 2.7]} color="#92400e" />
-      <Chair position={[-1.5, 0, 5.7]} color="#92400e" /><Chair position={[1.5, 0, 5.7]} color="#92400e" />
-      {/* Reading lamps */}
-      <ReadingLamp position={[-5, 0, 1.5]} /><ReadingLamp position={[5, 0, 1.5]} />
-      {/* Quiet zone sign */}
-      <NeonSign position={[0, 3.5, -9.4]} text="📚 Quiet Zone" color="#fbbf24" />
-      <Plant position={[-8, 0, 8]} /><Plant position={[8, 0, 8]} /><Plant position={[0, 0, -5]} />
-      <Avatar position={[-5, 1, 0.7]} name="Reader" bodyColor="#d97706" /><Avatar position={[1.5, 1, 2.7]} name="Student" bodyColor="#92400e" />
-    </group>
-  );
-}
-
-// ─── Gaming Lounge Layout ────────────────────────────────────────
-function GamingLayout({ palette }: { palette: typeof PALETTES.gaming }) {
-  return (
-    <group>
-      <WallPanel position={[0, 2.5, -10]} size={[20, 5, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-10, 2.5, 0]} size={[0.3, 5, 20]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[10, 2.5, 0]} size={[0.3, 5, 20]} color={palette.wall} emissiveColor={palette.emissive} />
-      {/* Gaming desks with dual monitors */}
-      {[[-6, 0, -4], [-3, 0, -4], [0, 0, -4], [3, 0, -4], [6, 0, -4]].map((p, i) => (
-        <group key={i}>
-          <Desk position={p as [number, number, number]} color="#0e3740" />
-          <Chair position={[p[0], p[1], p[2] + 0.8]} color="#06b6d4" />
-          <RoundedBox args={[0.6, 0.4, 0.025]} position={[p[0] + 0.5, 1.15, p[2] - 0.2]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#0a0a0a" emissive="#06b6d4" emissiveIntensity={0.25} />
-          </RoundedBox>
-        </group>
-      ))}
-      {/* Neon signs */}
-      <NeonSign position={[-7, 3.5, -9.4]} text="🎮 GAME ON" color="#22d3ee" />
-      <NeonSign position={[7, 3.5, -9.4]} text="🏆 TOP SCORE" color="#f59e0b" />
-      {/* Trophy case */}
-      <RoundedBox args={[2, 2.5, 0.5]} position={[9.2, 1.25, 0]} radius={0.05} smoothness={4} castShadow>
-        <meshStandardMaterial color="#0e3740" emissive="#06b6d4" emissiveIntensity={0.05} roughness={0.3} metalness={0.6} />
-      </RoundedBox>
-      <Text position={[9.2, 2.8, 0.3]} fontSize={0.2} color="#fbbf24" anchorX="center">{"🏆 TROPHIES"}</Text>
-      {/* LED strip accents */}
-      <NeonStrip start={[-10, 0.1, -10]} end={[10, 0.1, -10]} color="#22d3ee" />
-      <NeonStrip start={[-10, 4.5, -10]} end={[10, 4.5, -10]} color="#06b6d4" />
-      <NeonStrip start={[-10, 0.1, 10]} end={[10, 0.1, 10]} color="#22d3ee" />
-      {/* Lounge */}
-      <Sofa position={[-6, 0, 5]} color="#164e63" /><Sofa position={[6, 0, 5]} color="#164e63" />
-      <CoffeeTable position={[-6, 0, 3.5]} /><CoffeeTable position={[6, 0, 3.5]} />
-      <GlowPillar position={[-9.5, 2, -9.5]} color="#22d3ee" /><GlowPillar position={[9.5, 2, -9.5]} color="#67e8f9" /><GlowPillar position={[-9.5, 2, 9.5]} color="#06b6d4" /><GlowPillar position={[9.5, 2, 9.5]} color="#22d3ee" />
-      <Avatar position={[-6, 1, -3.2]} name="Gamer 1" bodyColor="#06b6d4" /><Avatar position={[0, 1, -3.2]} name="Gamer 2" bodyColor="#22d3ee" /><Avatar position={[6, 1, -3.2]} name="Gamer 3" bodyColor="#0ea5e9" />
-    </group>
-  );
-}
-
-// ─── Rooftop Garden Layout ───────────────────────────────────────
-function RooftopLayout({ palette }: { palette: typeof PALETTES.rooftop }) {
-  return (
-    <group>
-      {/* Low walls (railing) */}
-      <WallPanel position={[0, 0.5, -10]} size={[20, 1, 0.15]} color="#374151" emissiveColor={palette.emissive} />
-      <WallPanel position={[-10, 0.5, 0]} size={[0.15, 1, 20]} color="#374151" emissiveColor={palette.emissive} />
-      <WallPanel position={[10, 0.5, 0]} size={[0.15, 1, 20]} color="#374151" emissiveColor={palette.emissive} />
-      <WallPanel position={[0, 0.5, 10]} size={[20, 1, 0.15]} color="#374151" emissiveColor={palette.emissive} />
-      {/* Pergola structure */}
-      {[[-3, 3, -3], [3, 3, -3], [-3, 3, 3], [3, 3, 3]].map((p, i) => (
-        <mesh key={i} position={p as [number, number, number]}><cylinderGeometry args={[0.08, 0.08, 6, 8]} /><meshStandardMaterial color="#78350f" roughness={0.7} /></mesh>
-      ))}
-      {/* Pergola beams */}
-      {[-2, -1, 0, 1, 2].map((x, i) => (
-        <mesh key={`beam-${i}`} position={[x, 5.8, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.05, 0.05, 7, 8]} /><meshStandardMaterial color="#78350f" roughness={0.7} />
+      {/* Colored marker lines */}
+      {[[0.3, 0.3, "#e74c3c"], [-0.5, -0.1, "#3498db"], [0.1, -0.4, "#2ecc71"]].map(([x, y, c], i) => (
+        <mesh key={i} position={[x as number, y as number, 0.04]}>
+          <boxGeometry args={[0.8, 0.04, 0.01]} />
+          <meshStandardMaterial color={c as string} />
         </mesh>
       ))}
-      {/* String/fairy lights */}
-      <StringLights from={[-8, 4, -8]} to={[8, 4, -8]} color="#fbbf24" count={12} />
-      <StringLights from={[-8, 4.5, 0]} to={[8, 4.5, 0]} color="#fbbf24" count={12} />
-      <StringLights from={[-8, 4, 8]} to={[8, 4, 8]} color="#fde68a" count={12} />
-      {/* Planter boxes */}
-      {[[-7, 0, -5], [-7, 0, 0], [-7, 0, 5], [7, 0, -5], [7, 0, 0], [7, 0, 5]].map((p, i) => (
-        <group key={`planter-${i}`} position={p as [number, number, number]}>
-          <RoundedBox args={[1.5, 0.6, 0.8]} position={[0, 0.3, 0]} radius={0.05} smoothness={4} castShadow>
-            <meshStandardMaterial color="#78350f" roughness={0.8} />
-          </RoundedBox>
-          <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.3, 12, 12]} /><meshStandardMaterial color="#166534" roughness={0.8} /></mesh>
-        </group>
-      ))}
-      {/* Wooden benches */}
-      {[[0, 0, -6], [-4, 0, 6], [4, 0, 6]].map((p, i) => (
-        <RoundedBox key={`bench-${i}`} args={[2, 0.15, 0.6]} position={[p[0], 0.5, p[2]]} radius={0.03} smoothness={4} castShadow>
-          <meshStandardMaterial color="#92400e" roughness={0.6} />
-        </RoundedBox>
-      ))}
-      <Plant position={[-3, 0, -7]} /><Plant position={[3, 0, -7]} /><Plant position={[0, 0, 7]} />
-      <Avatar position={[0, 1, -5.5]} name="Zen" bodyColor="#84cc16" /><Avatar position={[-4, 1, 6.5]} name="Sky" bodyColor="#10b981" />
+      <Text position={[0, 0.6, 0.04]} fontSize={0.08} color="#666" anchorX="center">Sprint Goals</Text>
     </group>
   );
 }
 
-// ─── Theater Layout ──────────────────────────────────────────────
-function TheaterLayout({ palette }: { palette: typeof PALETTES.theater }) {
+function CeilingLight({ position }: { position: [number, number, number] }) {
   return (
-    <group>
-      <WallPanel position={[0, 3, -14]} size={[28, 6, 0.3]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[-14, 3, 0]} size={[0.3, 6, 28]} color={palette.wall} emissiveColor={palette.emissive} />
-      <WallPanel position={[14, 3, 0]} size={[0.3, 6, 28]} color={palette.wall} emissiveColor={palette.emissive} />
-      {/* Stage curtains (simplified as colored panels) */}
-      <RoundedBox args={[2, 7, 0.15]} position={[-8, 3.5, -13]} radius={0.05} smoothness={4}><meshStandardMaterial color="#7f1d1d" roughness={0.8} /></RoundedBox>
-      <RoundedBox args={[2, 7, 0.15]} position={[8, 3.5, -13]} radius={0.05} smoothness={4}><meshStandardMaterial color="#7f1d1d" roughness={0.8} /></RoundedBox>
-      {/* Recliner seats (tiered like auditorium but wider) */}
-      <AuditoriumSeats rows={7} seatsPerRow={12} color={palette.primary} />
-      {/* Aisle lights */}
-      {Array.from({ length: 7 }).flatMap((_, r) => [
-        <mesh key={`al-${r}`} position={[-7.5, r * 0.4 + 0.1, 3 + r * 1.8]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#fca5a5" emissive="#ef4444" emissiveIntensity={0.4} /></mesh>,
-        <mesh key={`ar-${r}`} position={[7.5, r * 0.4 + 0.1, 3 + r * 1.8]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#fca5a5" emissive="#ef4444" emissiveIntensity={0.4} /></mesh>,
-      ])}
-      <GlowPillar position={[-13, 3, -13]} color="#fca5a5" /><GlowPillar position={[13, 3, -13]} color="#fca5a5" />
-      <Plant position={[-12, 0, 12]} /><Plant position={[12, 0, 12]} />
-      <Avatar position={[-2, 1, 5]} name="Viewer 1" bodyColor="#ef4444" /><Avatar position={[2, 1, 5]} name="Viewer 2" bodyColor="#f87171" />
+    <group position={position}>
+      <mesh><boxGeometry args={[1.5, 0.05, 0.3]} /><meshStandardMaterial color="#f5f5f5" emissive="#fff" emissiveIntensity={0.15} /></mesh>
+      <pointLight position={[0, -0.2, 0]} intensity={0.3} color="#fff5e8" distance={8} />
     </group>
   );
 }
 
-// ─── Scene Lighting ──────────────────────────────────────────────
-function SceneLighting({ palette }: { palette: typeof PALETTES.classroom }) {
+/* ═══════════════════════════════════════════════════════════════
+   OFFICE WORLD LAYOUT — ALL ZONES
+   ═══════════════════════════════════════════════════════════════ */
+function OfficeWorldLayout() {
   return (
     <>
-      <ambientLight intensity={0.25} color="#b8c0ff" />
-      <directionalLight castShadow position={[15, 25, 15]} intensity={1.2} shadow-mapSize={[2048, 2048]} shadow-camera-left={-20} shadow-camera-right={20} shadow-camera-top={20} shadow-camera-bottom={-20} color="#fff5f5" />
-      <pointLight position={[0, 6, 0]} intensity={0.8} color={palette.emissive} distance={30} decay={2} />
-      <pointLight position={[-10, 3, -5]} intensity={0.4} color={palette.accent} distance={20} decay={2} />
-      <pointLight position={[10, 3, 5]} intensity={0.4} color={palette.primary} distance={20} decay={2} />
+      {/* ── FLOOR ─────────────────────────────────── */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[60, 60]} />
+        <meshStandardMaterial color={P.floor} roughness={0.9} metalness={0.1} />
+      </mesh>
+      <gridHelper args={[60, 60, "#bbb", "#ccc"]} position={[0, 0.01, 0]} material-opacity={0.12} material-transparent />
+
+      {/* ── ZONE RUGS (colored floors per zone) ──── */}
+      <ZoneRug position={[0, 0, 24]} size={[56, 8]} color="#e8ddd0" />        {/* Lobby — warm beige */}
+      <ZoneRug position={[0, 0, 10]} size={[36, 16]} color="#dce8d8" />       {/* Workspace — light sage */}
+      <ZoneRug position={[-24, 0, -4]} size={[8, 8]} color="#d0e0f0" />       {/* Meeting 1 — soft blue */}
+      <ZoneRug position={[0, 0, -6]} size={[20, 8]} color="#d0e0f0" />        {/* Meeting 2 — soft blue */}
+      <ZoneRug position={[24, 0, -4]} size={[8, 8]} color="#d0e0f0" />        {/* Meeting 3 — soft blue */}
+      <ZoneRug position={[-24, 0, 10]} size={[8, 16]} color="#f0e0d0" />      {/* Café — warm terracotta */}
+      <ZoneRug position={[0, 0, -18]} size={[20, 12]} color="#d8e8d0" />      {/* Stage — light green */}
+      <ZoneRug position={[-21, 0, -18]} size={[14, 12]} color="#e8dac0" />    {/* Library — parchment */}
+      <ZoneRug position={[21, 0, -18]} size={[14, 12]} color="#d0e8f0" />     {/* Gaming — cool cyan */}
+      <ZoneRug position={[0, 0, -27.5]} size={[56, 3]} color="#c8d8b8" />     {/* Rooftop — moss green */}
+
+      {/* ── OUTER WALLS ───────────────────────────── */}
+      {[
+        [0, 1.5, 29.5, 60, 3, 0.2],
+        [0, 1.5, -29.5, 60, 3, 0.2],
+        [-29.5, 1.5, 0, 0.2, 3, 60],
+        [29.5, 1.5, 0, 0.2, 3, 60],
+      ].map((w, i) => (
+        <mesh key={`wall-${i}`} position={[w[0] as number, w[1] as number, w[2] as number]}>
+          <boxGeometry args={[w[3] as number, w[4] as number, w[5] as number]} />
+          <meshStandardMaterial color={P.wall} roughness={0.7} metalness={0.2} />
+        </mesh>
+      ))}
+
+      {/* ── ZONE LABELS ───────────────────────────── */}
+      {ZONES.map(z => (
+        <ZoneLabel key={z.name} position={[(z.bounds.minX + z.bounds.maxX) / 2, 3.2, (z.bounds.minZ + z.bounds.maxZ) / 2]} text={z.name} emoji={z.emoji} />
+      ))}
+
+      {/* ── LOBBY ─────────────────────────────────── */}
+      <ReceptionDesk position={[0, 0, 22.5]} />
+      <Sofa position={[-10, 0, 24]} />
+      <Sofa position={[10, 0, 24]} />
+      <Plant position={[-14, 0, 22]} />
+      <Plant position={[14, 0, 22]} />
+      <Plant position={[-20, 0, 26]} />
+      <Plant position={[20, 0, 26]} />
+      <NeonSign position={[0, 2.8, 29]} text="🏢 HUDDLY OFFICE" color={P.greenLight} />
+
+      {/* ── WORKSPACE (desk pods) ─────────────────── */}
+      {/* Pod 1 */}
+      <Desk position={[-14, 0, 5]} />
+      <Desk position={[-10, 0, 5]} />
+      <Chair position={[-14, 0, 4.2]} />
+      <Chair position={[-10, 0, 4.2]} />
+      {/* Pod 2 */}
+      <Desk position={[-2, 0, 5]} />
+      <Desk position={[2, 0, 5]} />
+      <Chair position={[-2, 0, 4.2]} />
+      <Chair position={[2, 0, 4.2]} />
+      {/* Pod 3 */}
+      <Desk position={[10, 0, 5]} />
+      <Desk position={[14, 0, 5]} />
+      <Chair position={[10, 0, 4.2]} />
+      <Chair position={[14, 0, 4.2]} />
+      {/* Pod 4 */}
+      <Desk position={[-14, 0, 11]} />
+      <Desk position={[-10, 0, 11]} />
+      <Chair position={[-14, 0, 10.2]} />
+      <Chair position={[-10, 0, 10.2]} />
+      {/* Pod 5 */}
+      <Desk position={[-2, 0, 11]} />
+      <Desk position={[2, 0, 11]} />
+      <Chair position={[-2, 0, 10.2]} />
+      <Chair position={[2, 0, 10.2]} />
+      {/* Pod 6 */}
+      <Desk position={[10, 0, 11]} />
+      <Desk position={[14, 0, 11]} />
+      <Chair position={[10, 0, 10.2]} />
+      <Chair position={[14, 0, 10.2]} />
+      {/* Standing desks + utilities */}
+      <StandingDesk position={[-6, 0, 16]} />
+      <StandingDesk position={[6, 0, 16]} />
+      <WaterCooler position={[18, 0, 10]} />
+      <ScrumBoard position={[19, 0, 6]} rotation={[0, -Math.PI / 2, 0]} />
+
+      {/* ── MEETING ROOM 1 (west) ─────────────────── */}
+      <GlassPartition position={[-24, 1.5, 0]} size={[8, 3, 0.1]} />
+      <GlassPartition position={[-20, 1.5, -4]} size={[0.1, 3, 8]} />
+      <MeetingTable position={[-24, 0, -4]} />
+      <Chair position={[-26, 0, -4]} color="#3B82F6" />
+      <Chair position={[-22, 0, -4]} color="#3B82F6" />
+      <Chair position={[-24, 0, -6]} color="#3B82F6" />
+      <Chair position={[-24, 0, -2]} color="#3B82F6" />
+      <BroadcastScreen position={[-27.5, 1.5, -4]} rotation={[0, Math.PI / 2, 0]} size={[2, 1.3]} />
+
+      {/* ── MEETING ROOM 2 (center, large) ────────── */}
+      <GlassPartition position={[-10, 1.5, -6]} size={[0.1, 3, 8]} />
+      <GlassPartition position={[10, 1.5, -6]} size={[0.1, 3, 8]} />
+      <GlassPartition position={[0, 1.5, -10]} size={[20, 3, 0.1]} />
+      <MeetingTable position={[0, 0, -6]} size="large" />
+      {[-3, -1, 1, 3].map(x => <Chair key={`mc-n-${x}`} position={[x, 0, -8]} color="#3B82F6" />)}
+      {[-3, -1, 1, 3].map(x => <Chair key={`mc-s-${x}`} position={[x, 0, -4]} color="#3B82F6" />)}
+      <BroadcastScreen position={[0, 1.8, -9.5]} size={[5, 2.5]} />
+
+      {/* ── MEETING ROOM 3 (east) ─────────────────── */}
+      <GlassPartition position={[24, 1.5, 0]} size={[8, 3, 0.1]} />
+      <GlassPartition position={[20, 1.5, -4]} size={[0.1, 3, 8]} />
+      <MeetingTable position={[24, 0, -4]} />
+      <Chair position={[22, 0, -4]} color="#3B82F6" />
+      <Chair position={[26, 0, -4]} color="#3B82F6" />
+      <Chair position={[24, 0, -6]} color="#3B82F6" />
+      <Chair position={[24, 0, -2]} color="#3B82F6" />
+      <BroadcastScreen position={[27.5, 1.5, -4]} rotation={[0, -Math.PI / 2, 0]} size={[2, 1.3]} />
+
+      {/* ── CAFÉ / BREAK AREA ─────────────────────── */}
+      {/* Counter */}
+      <RoundedBox args={[5, 1.1, 0.8]} position={[-24.5, 0.55, 10]} radius={0.04} smoothness={4} castShadow>
+        <meshStandardMaterial color={P.desk} roughness={0.4} metalness={0.3} />
+      </RoundedBox>
+      <CoffeeMachine position={[-26, 1.12, 10]} />
+      {/* Bistro tables */}
+      {[[-24, 6], [-24, 14], [-22, 10]].map(([x, z], i) => (
+        <group key={`bistro-${i}`}>
+          <mesh position={[x, 0.6, z]}><cylinderGeometry args={[0.4, 0.4, 0.04, 16]} /><meshStandardMaterial color={P.deskTop} /></mesh>
+          <mesh position={[x, 0.3, z]}><cylinderGeometry args={[0.05, 0.05, 0.6, 8]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
+        </group>
+      ))}
+      <JukeBox position={[-27, 0, 4]} />
+      <PendantLight position={[-24, 3, 6]} />
+      <PendantLight position={[-24, 3, 10]} />
+      <PendantLight position={[-24, 3, 14]} />
+      <NeonSign position={[-24, 2.7, 17.5]} text="☕ CAFÉ" color={P.warmLight} />
+
+      {/* ── MAIN STAGE ────────────────────────────── */}
+      {/* Elevated platform */}
+      <mesh position={[0, 0.15, -18]} receiveShadow>
+        <boxGeometry args={[12, 0.3, 4]} />
+        <meshStandardMaterial color="#222" roughness={0.6} metalness={0.3} />
+      </mesh>
+      {/* Podium */}
+      <RoundedBox args={[0.8, 1.2, 0.5]} position={[0, 0.9, -18]} radius={0.04} smoothness={4}>
+        <meshStandardMaterial color={P.desk} roughness={0.5} />
+      </RoundedBox>
+      <BroadcastScreen position={[0, 2.5, -22]} size={[8, 4]} />
+      {/* Audience seating rows */}
+      {[-4, -2, 0, 2, 4].map(x => [-14, -15, -16].map(z => (
+        <Chair key={`seat-${x}-${z}`} position={[x, 0, z]} color="#444" />
+      )))}
+      <NeonSign position={[0, 2.8, -12.5]} text="🎤 MAIN STAGE" color={P.greenLight} />
+
+      {/* ── LIBRARY / QUIET ZONE ──────────────────── */}
+      <Bookshelf position={[-26, 0, -14]} />
+      <Bookshelf position={[-24, 0, -14]} />
+      <Bookshelf position={[-22, 0, -14]} />
+      <Bookshelf position={[-26, 0, -18]} />
+      <Bookshelf position={[-24, 0, -18]} />
+      <Bookshelf position={[-22, 0, -18]} />
+      <Sofa position={[-20, 0, -22]} rotation={[0, Math.PI / 2, 0]} color="#8B6914" />
+      <Sofa position={[-18, 0, -16]} color="#8B6914" />
+      <Plant position={[-16, 0, -14]} />
+      <Plant position={[-26, 0, -22]} />
+      <NeonSign position={[-21, 2.7, -12.5]} text="📖 QUIET ZONE" color="#E9C46A" />
+
+      {/* ── GAMING CORNER ─────────────────────────── */}
+      <Desk position={[18, 0, -16]} />
+      <Desk position={[22, 0, -16]} />
+      <Desk position={[26, 0, -16]} />
+      <Desk position={[18, 0, -20]} />
+      <Desk position={[22, 0, -20]} />
+      <Chair position={[18, 0, -14.8]} color="#06b6d4" />
+      <Chair position={[22, 0, -14.8]} color="#06b6d4" />
+      <Chair position={[26, 0, -14.8]} color="#06b6d4" />
+      <Chair position={[18, 0, -18.8]} color="#06b6d4" />
+      <Chair position={[22, 0, -18.8]} color="#06b6d4" />
+      <ArcadeCabinet position={[26, 0, -22]} />
+      <NeonSign position={[21, 2.7, -12.5]} text="🎮 GAME ON" color="#06b6d4" />
+
+      {/* ── ROOFTOP TERRACE (south edge, elevated) ── */}
+      <mesh position={[0, 0.4, -27.5]} receiveShadow>
+        <boxGeometry args={[56, 0.8, 3]} />
+        <meshStandardMaterial color="#3d2b1f" roughness={0.8} />
+      </mesh>
+      {/* Pergola columns */}
+      {[-20, -10, 0, 10, 20].map(x => (
+        <mesh key={`pergola-${x}`} position={[x, 2, -27.5]}>
+          <cylinderGeometry args={[0.08, 0.08, 3.2, 8]} />
+          <meshStandardMaterial color="#5C3A1E" roughness={0.7} />
+        </mesh>
+      ))}
+      {/* Benches */}
+      {[-15, -5, 5, 15].map(x => (
+        <RoundedBox key={`bench-${x}`} args={[2, 0.3, 0.5]} position={[x, 1, -27.5]} radius={0.04} smoothness={4}>
+          <meshStandardMaterial color="#5C3A1E" roughness={0.6} />
+        </RoundedBox>
+      ))}
+      <Plant position={[-24, 0.8, -27]} />
+      <Plant position={[24, 0.8, -27]} />
+
+      {/* ── PLANTS THROUGHOUT ─────────────────────── */}
+      {[[-6, 0, 18], [6, 0, 18], [-18, 0, 2], [18, 0, 2], [-12, 0, -8], [12, 0, -8],
+      [-8, 0, 14], [8, 0, 14], [-4, 0, 2], [4, 0, 2], [-16, 0, -16], [16, 0, -14]].map((p, i) => (
+        <Plant key={`plant-${i}`} position={p as [number, number, number]} />
+      ))}
+
+      {/* ── FLOOR LAMPS ──────────────────────────── */}
+      <FloorLamp position={[-27, 0, 6]} lightColor="#fff5e0" />
+      <FloorLamp position={[-27, 0, 14]} lightColor="#fff5e0" />
+      <FloorLamp position={[-16, 0, -22]} lightColor="#ffe8c0" />
+      <FloorLamp position={[16, 0, -22]} lightColor="#c0f0ff" />
+      <FloorLamp position={[-18, 0, 8]} lightColor="#fff" />
+      <FloorLamp position={[18, 0, 8]} lightColor="#fff" />
+
+      {/* ── CEILING LIGHTS ───────────────────────── */}
+      <CeilingLight position={[-12, 4, 8]} />
+      <CeilingLight position={[0, 4, 8]} />
+      <CeilingLight position={[12, 4, 8]} />
+      <CeilingLight position={[-12, 4, 14]} />
+      <CeilingLight position={[0, 4, 14]} />
+      <CeilingLight position={[12, 4, 14]} />
+      <CeilingLight position={[0, 4, -6]} />
+      <CeilingLight position={[-24, 4, 10]} />
+
+      {/* ── WHITEBOARDS ──────────────────────────── */}
+      <Whiteboard position={[0, 1.5, 1.5]} />
+      <Whiteboard position={[-24, 1.5, -7.5]} rotation={[0, 0, 0]} />
+
+      {/* ── WALL CLOCKS ──────────────────────────── */}
+      <WallClock position={[0, 2.5, 29.3]} />
+      <WallClock position={[-29.3, 2.5, 0]} rotation={[0, Math.PI / 2, 0]} />
+
+      {/* ── WALL POSTERS ─────────────────────────── */}
+      <WallPoster position={[-29.3, 1.8, 6]} rotation={[0, Math.PI / 2, 0]} color="#e74c3c" text="THINK BIG" />
+      <WallPoster position={[-29.3, 1.8, 14]} rotation={[0, Math.PI / 2, 0]} color="#3498db" text="STAY CURIOUS" />
+      <WallPoster position={[29.3, 1.8, -16]} rotation={[0, -Math.PI / 2, 0]} color="#9b59b6" text="GAME ON!" />
+      <WallPoster position={[29.3, 1.8, -20]} rotation={[0, -Math.PI / 2, 0]} color="#1abc9c" text="LEVEL UP" />
+      <WallPoster position={[-29.3, 1.8, -16]} rotation={[0, Math.PI / 2, 0]} color="#f39c12" text="READ MORE" />
+      <WallPoster position={[0, 1.8, 29.3]} color="#2ecc71" text="WELCOME" />
     </>
   );
 }
 
-// Screen positions per template
-const SCREEN_POS: Record<RoomTemplate, { pos: [number, number, number]; size?: [number, number, number] }> = {
-  classroom: { pos: [0, 3, -11.5] },
-  office: { pos: [0, 3, -9.5], size: [5, 3, 0.15] },
-  cafe: { pos: [0, 3, -7.5], size: [4, 2.5, 0.15] },
-  conference: { pos: [0, 4, -13.5], size: [10, 5, 0.2] },
-  party: { pos: [0, 3, -11.5], size: [8, 4, 0.15] },
-  library: { pos: [0, 3, -9.5], size: [5, 3, 0.15] },
-  gaming: { pos: [0, 3.5, -9.5], size: [6, 3, 0.15] },
-  rooftop: { pos: [0, 3, -9.5], size: [5, 3, 0.15] },
-  theater: { pos: [0, 4.5, -13.4], size: [14, 7, 0.2] },
-};
+/* ═══════════════════════════════════════════════════════════════
+   SCENE LIGHTING
+   ═══════════════════════════════════════════════════════════════ */
+function SceneLighting() {
+  return (
+    <>
+      <ambientLight intensity={1.2} color="#fffbf0" />
+      <directionalLight castShadow position={[20, 30, 15]} intensity={1.5} color="#fff8ee" shadow-mapSize={[2048, 2048]} shadow-camera-far={80} shadow-camera-left={-35} shadow-camera-right={35} shadow-camera-top={35} shadow-camera-bottom={-35} />
+      <directionalLight position={[-15, 25, -10]} intensity={0.6} color="#e8f0ff" />
+      <pointLight position={[0, 8, 24]} intensity={0.6} color="#fff" distance={30} />
+      <pointLight position={[0, 8, 0]} intensity={0.5} color="#fff" distance={35} />
+      <pointLight position={[-24, 6, 10]} intensity={0.5} color={P.warmLight} distance={18} />
+      <pointLight position={[0, 7, -18]} intensity={0.5} color="#fff" distance={20} />
+      <pointLight position={[24, 6, -4]} intensity={0.4} color="#fff" distance={18} />
+      <hemisphereLight args={["#87CEEB", "#d4cfc4", 0.6]} />
+    </>
+  );
+}
 
-export default function ThreeRoom({ template = "classroom", roomName = "Room", broadcastStream, onBroadcast }: ThreeRoomProps) {
-  const palette = PALETTES[template] || PALETTES.classroom;
-  const keys = useKeyboard();
-  const playerPos = useRef(new THREE.Vector3(0, 0.6, 5));
-  const colliders = useMemo(() => ROOM_COLLIDERS[template] || ROOM_COLLIDERS.classroom, [template]);
-  const screenCfg = SCREEN_POS[template] || SCREEN_POS.classroom;
+/* ═══════════════════════════════════════════════════════════════
+   CAFE & PARTY LAYOUTS
+   ═══════════════════════════════════════════════════════════════ */
+function CafeLayout() {
+  return (
+    <group>
+      <RoundedBox args={[12, 3, 0.2]} position={[0, 1.5, -6]} radius={0.05}>
+        <meshStandardMaterial color={P.wall} />
+      </RoundedBox>
+      <RoundedBox args={[12, 3, 0.2]} position={[0, 1.5, 6]} radius={0.05}>
+        <meshStandardMaterial color={P.wall} />
+      </RoundedBox>
+      <RoundedBox args={[0.2, 3, 12]} position={[-6, 1.5, 0]} radius={0.05}>
+        <meshStandardMaterial color={P.wall} />
+      </RoundedBox>
+      <RoundedBox args={[0.2, 3, 12]} position={[6, 1.5, 0]} radius={0.05}>
+        <meshStandardMaterial color={P.wall} />
+      </RoundedBox>
 
-  const handlePositionChange = useCallback((pos: THREE.Vector3) => {
-    playerPos.current.copy(pos);
-  }, []);
+      {/* Counter */}
+      <RoundedBox args={[6, 1.2, 1.5]} position={[0, 0.6, -4]} radius={0.05}>
+        <meshStandardMaterial color="#8B4513" />
+      </RoundedBox>
+      <CoffeeMachine position={[-1.5, 1.2, -4]} />
+      <WaterCooler position={[2, 0, -4]} />
 
-  const RoomContent = useMemo(() => {
-    switch (template) {
-      case "office": return <OfficeLayout palette={palette} />;
-      case "cafe": return <CafeLayout palette={palette} />;
-      case "conference": return <ConferenceLayout palette={palette} />;
-      case "party": return <PartyLayout palette={palette} />;
-      case "library": return <LibraryLayout palette={palette} />;
-      case "gaming": return <GamingLayout palette={palette} />;
-      case "rooftop": return <RooftopLayout palette={palette} />;
-      case "theater": return <TheaterLayout palette={palette} />;
-      default: return <ClassroomLayout palette={palette} />;
-    }
-  }, [template, palette]);
+      {/* Tables */}
+      {[-3, 3].map(x => (
+        <group key={`table-${x}`} position={[x, 0, 0]}>
+          <cylinderGeometry args={[0.8, 0.8, 0.05, 16]} />
+          <mesh position={[0, 0.8, 0]}><cylinderGeometry args={[0.8, 0.8, 0.05, 16]} /><meshStandardMaterial color="#D4A373" /></mesh>
+          <mesh position={[0, 0.4, 0]}><cylinderGeometry args={[0.05, 0.05, 0.8, 8]} /><meshStandardMaterial color="#333" /></mesh>
+          <Chair position={[-1.2, 0, 0]} color="#E9C46A" />
+          <Chair position={[1.2, 0, 0]} color="#E9C46A" />
+        </group>
+      ))}
 
-  const usesSky = template === "rooftop";
+      <NeonSign position={[0, 2.5, -5.8]} text="☕ HUDDLY CAFE" color="#ff9f43" />
+      <Plant position={[-5, 0, -5]} />
+      <Plant position={[5, 0, -5]} />
+      <Plant position={[-5, 0, 5]} />
+    </group>
+  );
+}
+
+function PartyLayout() {
+  return (
+    <group>
+      {/* Darker floors & walls for party */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <planeGeometry args={[20, 20]} />
+        <meshStandardMaterial color="#111" />
+      </mesh>
+
+      {/* Dance floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <planeGeometry args={[8, 8]} />
+        <meshStandardMaterial color="#222" emissive="#06b6d4" emissiveIntensity={0.2} wireframe />
+      </mesh>
+
+      <JukeBox position={[0, 0, -4]} />
+      <ArcadeCabinet position={[-3, 0, -4]} />
+      <ArcadeCabinet position={[3, 0, -4]} />
+
+      {/* Glow lights */}
+      <pointLight position={[0, 3, 0]} color="#a855f7" intensity={2} distance={10} />
+      <pointLight position={[-4, 3, 4]} color="#06b6d4" intensity={2} distance={10} />
+      <pointLight position={[4, 3, 4]} color="#ec4899" intensity={2} distance={10} />
+
+      <NeonSign position={[0, 2.5, -4.5]} text="🎉 PARTY TIME" color="#ec4899" />
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN SCENE
+   ═══════════════════════════════════════════════════════════════ */
+function Scene({ userName, onZoneChange, onNearChair, template }: { userName: string; onZoneChange: (z: string) => void; onNearChair: (near: boolean) => void; template: string }) {
+  const players = useRealtimeStore(s => s.players);
+  const myId = useRealtimeStore(s => s.myId);
 
   return (
-    <div className="w-full h-full" style={{ background: "#050208" }}>
+    <>
+      <color attach="background" args={["#c5dae8"]} />
+      <fog attach="fog" args={["#c5dae8", 45, 80]} />
+
+      <SceneLighting />
+      <Sky sunPosition={[100, 60, 80]} turbidity={2} rayleigh={0.8} mieCoefficient={0.005} mieDirectionalG={0.9} />
+      <Sparkles count={40} scale={50} size={2} speed={0.1} color={P.accent} opacity={0.08} />
+
+      {/* Render layout based on template */}
+      {template === "cafe" ? <CafeLayout /> : template === "party" ? <PartyLayout /> : <OfficeWorldLayout />}
+
+      {/* Render live players */}
+      {Array.from(players.values()).map(p => {
+        if (p.id === myId) return null; // Don't render self in FPS
+        return (
+          <group key={p.id} position={[p.x, p.y, p.z]}>
+            <Avatar color={p.color} name={p.name} />
+          </group>
+        );
+      })}
+
+      <PlayerController userName={userName} onZoneChange={onZoneChange} onNearChair={onNearChair} />
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXPORTED COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
+export default function ThreeRoom({ roomId, userName = "You", template = "office" }: ThreeRoomProps) {
+  const [currentZone, setCurrentZone] = useState("Lobby");
+  const [nearChair, setNearChair] = useState(false);
+  const connect = useRealtimeStore(s => s.connect);
+  const disconnect = useRealtimeStore(s => s.disconnect);
+  const [locked, setLocked] = useState(false);
+
+  useEffect(() => {
+    connect(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001", userName, roomId);
+    return () => disconnect();
+  }, [roomId, userName, connect, disconnect]);
+
+  return (
+    <div className="w-full h-full relative three-canvas">
+      {!locked && (
+        <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-sm flex items-center justify-center cursor-pointer" onClick={() => setLocked(true)}>
+          <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl flex flex-col items-center">
+            <span className="text-4xl mb-3">🖱️</span>
+            <span className="text-xl font-bold text-gray-900">Click to Enter</span>
+            <span className="text-sm text-gray-500 mt-1">First-Person Meeting Experience</span>
+          </div>
+        </div>
+      )}
+
       <Canvas
         shadows
-        camera={{ position: [0, 12, 20], fov: 50, near: 0.1, far: 200 }}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: usesSky ? 1.5 : 1.2 }}
+        camera={{ position: [0, 1.25, 24], fov: 60, near: 0.1, far: 200 }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.4 }}
+        onPointerDown={() => setLocked(true)}
       >
-        <color attach="background" args={[usesSky ? "#1a1a2e" : palette.floor]} />
-        {!usesSky && <fog attach="fog" args={[palette.floor, 20, 60]} />}
-        {usesSky && <Sky sunPosition={[100, 20, 100]} turbidity={8} rayleigh={2} />}
-
-        <SceneLighting palette={palette} />
-        <FollowCamera target={playerPos} />
-
-        <Stars radius={80} depth={50} count={4000} factor={4} saturation={0.5} fade speed={0.8} />
-        <Sparkles count={60} scale={30} size={3} speed={0.3} color={palette.emissive} opacity={0.15} />
-
-        <ReflectiveFloor color={palette.floor} />
-        <FloorGrid color={palette.accent} />
-
-
-        {RoomContent}
-
-        {/* Central live broadcast screen — any user can activate when near */}
-        <LiveBroadcastScreen
-          position={screenCfg.pos}
-          size={screenCfg.size}
-          playerRef={playerPos}
-          stream={broadcastStream}
-          onActivate={onBroadcast}
-        />
-
-        {/* Wandering NPCs */}
-        <WanderingNPC name="Roaming 1" bodyColor={palette.primary} startPos={[5, 1, 3]} bounds={3} playerRef={playerPos} />
-        <WanderingNPC name="Roaming 2" bodyColor={palette.accent} startPos={[-5, 1, 0]} bounds={4} playerRef={playerPos} />
-
-        <PlayerAvatar keys={keys} onPositionChange={handlePositionChange} colliders={colliders} />
-
-        <OrbitControls
-          makeDefault
-          enablePan enableZoom enableRotate
-          maxPolarAngle={Math.PI / 2.1}
-          minDistance={5} maxDistance={40}
-          target={[0, 1, 0]}
-        />
+        <Scene userName={userName} onZoneChange={setCurrentZone} onNearChair={setNearChair} template={template} />
       </Canvas>
+
+      {/* Zone indicator */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-black/60 backdrop-blur-xl border border-white/10">
+        <span className="text-lg">{ZONES.find(z => z.name === currentZone)?.emoji || "🏢"}</span>
+        <span className="text-white text-sm font-semibold">{currentZone}</span>
+      </div>
+
+      {/* Sit prompt */}
+      {nearChair && locked && (
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600/90 backdrop-blur-sm text-white text-sm font-semibold shadow-lg animate-bounce">
+          <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-xs font-mono">E</kbd>
+          Sit / Stand
+        </div>
+      )}
+
+      {/* Crosshair */}
+      {locked && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-1.5 h-1.5 rounded-full bg-white mix-blend-difference pointer-events-none" />
+      )}
+
+      {/* WASD hint */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 text-gray-500 text-xs bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full select-none pointer-events-none">
+        Movement: WASD · Look: Mouse · Interact: E · Exit Look: ESC
+      </div>
     </div>
   );
 }

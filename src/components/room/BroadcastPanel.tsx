@@ -4,34 +4,17 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Radio, X, Eye, Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Users } from "lucide-react";
 
+import { useLocalParticipant, useTracks } from "@livekit/components-react";
+import { Track } from "livekit-client";
+
 interface BroadcastPanelProps {
     isOpen: boolean;
     onClose: () => void;
-    localStream: MediaStream | null;
-    screenStream: MediaStream | null;
-    isMuted: boolean;
-    isCameraOff: boolean;
-    isScreenSharing: boolean;
-    onToggleMute: () => void;
-    onToggleCamera: () => void;
-    onStartScreenShare: () => void;
-    onStopScreenShare: () => void;
-    onStartMedia: () => void;
 }
 
 export default function BroadcastPanel({
     isOpen,
     onClose,
-    localStream,
-    screenStream,
-    isMuted,
-    isCameraOff,
-    isScreenSharing,
-    onToggleMute,
-    onToggleCamera,
-    onStartScreenShare,
-    onStopScreenShare,
-    onStartMedia,
 }: BroadcastPanelProps) {
     const [isLive, setIsLive] = useState(false);
     const [viewerCount, setViewerCount] = useState(0);
@@ -39,24 +22,48 @@ export default function BroadcastPanel({
     const videoRef = useRef<HTMLVideoElement>(null);
     const screenRef = useRef<HTMLVideoElement>(null);
 
+    const { localParticipant } = useLocalParticipant();
+    const tracks = useTracks([
+        { source: Track.Source.Camera, withPlaceholder: false },
+        { source: Track.Source.ScreenShare, withPlaceholder: false }
+    ], { onlySubscribed: false });
+
+    // Local participant tracks
+    const localCameraTrack = tracks.find(t => t.participant.identity === localParticipant.identity && t.source === Track.Source.Camera)?.publication?.track;
+    const localScreenTrack = tracks.find(t => t.participant.identity === localParticipant.identity && t.source === Track.Source.ScreenShare)?.publication?.track;
+
+    const isCameraOff = !localParticipant.isCameraEnabled;
+    const isMuted = !localParticipant.isMicrophoneEnabled;
+    const isScreenSharing = localParticipant.isScreenShareEnabled;
+
     // Attach local camera stream to video element
     useEffect(() => {
-        if (videoRef.current && localStream) {
-            videoRef.current.srcObject = localStream;
+        if (videoRef.current && localCameraTrack) {
+            localCameraTrack.attach(videoRef.current);
         }
-    }, [localStream, isCameraOff]);
+        return () => {
+            if (videoRef.current && localCameraTrack) {
+                localCameraTrack.detach(videoRef.current);
+            }
+        };
+    }, [localCameraTrack, isCameraOff]);
 
     // Attach screen share stream
     useEffect(() => {
-        if (screenRef.current && screenStream) {
-            screenRef.current.srcObject = screenStream;
+        if (screenRef.current && localScreenTrack) {
+            localScreenTrack.attach(screenRef.current);
         }
-    }, [screenStream]);
+        return () => {
+            if (screenRef.current && localScreenTrack) {
+                localScreenTrack.detach(screenRef.current);
+            }
+        };
+    }, [localScreenTrack]);
 
     // When going live, make sure media is started
     const handleGoLive = async () => {
-        if (!localStream) {
-            onStartMedia();
+        if (isCameraOff) {
+            await localParticipant.setCameraEnabled(true);
         }
         setIsLive(true);
     };
@@ -129,7 +136,7 @@ export default function BroadcastPanel({
                         <div className={`relative aspect-video rounded-xl overflow-hidden ${isLive ? "ring-2 ring-red-500/50 shadow-lg shadow-red-500/10" : "ring-1 ring-white/10"
                             }`}>
                             {/* Screen share takes priority when broadcasting */}
-                            {isScreenSharing && screenStream ? (
+                            {isScreenSharing && localScreenTrack ? (
                                 <video
                                     ref={screenRef}
                                     autoPlay
@@ -137,7 +144,7 @@ export default function BroadcastPanel({
                                     muted
                                     className="w-full h-full object-contain bg-black"
                                 />
-                            ) : localStream && !isCameraOff ? (
+                            ) : localCameraTrack && !isCameraOff ? (
                                 <video
                                     ref={videoRef}
                                     autoPlay
@@ -151,7 +158,7 @@ export default function BroadcastPanel({
                                     <div className="text-center">
                                         <VideoOff className="w-8 h-8 text-gray-600 mx-auto mb-2" />
                                         <span className="text-xs text-gray-500">
-                                            {localStream ? "Camera off" : "Camera not started"}
+                                            {localCameraTrack ? "Camera off" : "Camera not started"}
                                         </span>
                                     </div>
                                 </div>
@@ -204,7 +211,7 @@ export default function BroadcastPanel({
                     <div className="px-4 py-3 border-t border-white/10 space-y-3">
                         <div className="flex items-center justify-center gap-2">
                             <button
-                                onClick={onToggleMute}
+                                onClick={async () => await localParticipant.setMicrophoneEnabled(isMuted)}
                                 className={`p-2.5 rounded-xl transition-all ${isMuted ? "bg-red-500/20 text-red-400" : "bg-white/5 text-gray-300 hover:bg-white/10"
                                     }`}
                                 title={isMuted ? "Unmute" : "Mute"}
@@ -213,7 +220,7 @@ export default function BroadcastPanel({
                             </button>
 
                             <button
-                                onClick={onToggleCamera}
+                                onClick={async () => await localParticipant.setCameraEnabled(isCameraOff)}
                                 className={`p-2.5 rounded-xl transition-all ${isCameraOff ? "bg-red-500/20 text-red-400" : "bg-white/5 text-gray-300 hover:bg-white/10"
                                     }`}
                                 title={isCameraOff ? "Camera on" : "Camera off"}
@@ -222,7 +229,7 @@ export default function BroadcastPanel({
                             </button>
 
                             <button
-                                onClick={isScreenSharing ? onStopScreenShare : onStartScreenShare}
+                                onClick={async () => await localParticipant.setScreenShareEnabled(!isScreenSharing)}
                                 className={`p-2.5 rounded-xl transition-all ${isScreenSharing ? "bg-blue-500/20 text-blue-400" : "bg-white/5 text-gray-300 hover:bg-white/10"
                                     }`}
                                 title={isScreenSharing ? "Stop sharing" : "Share screen"}

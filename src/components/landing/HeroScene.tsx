@@ -57,7 +57,7 @@ function MiniDesk({ position }: { position: [number, number, number] }) {
             ))}
             {/* Tiny monitor */}
             <RoundedBox args={[0.3, 0.2, 0.015]} position={[0, 0.55, -0.1]} radius={0.01} smoothness={4}>
-                <meshStandardMaterial color="#0a0a0a" emissive="#6366f1" emissiveIntensity={0.15} />
+                <meshStandardMaterial color="#222" emissive="#3d8b6a" emissiveIntensity={0.15} />
             </RoundedBox>
         </group>
     );
@@ -79,9 +79,9 @@ function MiniScreen() {
             </RoundedBox>
             <mesh ref={ref} position={[0, 0, 0.04]}>
                 <planeGeometry args={[2.3, 1.2]} />
-                <meshStandardMaterial color="#0a0520" emissive="#7c3aed" emissiveIntensity={0.4} roughness={0.1} metalness={0.9} />
+                <meshStandardMaterial color="#1a3020" emissive="#3d8b6a" emissiveIntensity={0.4} roughness={0.1} metalness={0.9} />
             </mesh>
-            <Text position={[0, 0, 0.08]} fontSize={0.12} color="#c4b5fd" anchorX="center" fillOpacity={0.9}>
+            <Text position={[0, 0, 0.08]} fontSize={0.12} color="#6ecfa0" anchorX="center" fillOpacity={0.9}>
                 {"🎥  LIVE"}
             </Text>
         </group>
@@ -92,16 +92,17 @@ function MiniScreen() {
 function Scene() {
     return (
         <>
-            <color attach="background" args={["#08041a"]} />
-            <fog attach="fog" args={["#08041a", 6, 14]} />
+            <color attach="background" args={["#e8e0d0"]} />
+            <fog attach="fog" args={["#e8e0d0", 6, 14]} />
 
-            <ambientLight intensity={0.3} color="#c4b5fd" />
-            <directionalLight castShadow position={[5, 8, 5]} intensity={1} shadow-mapSize={[1024, 1024]} color="#fff5f5" />
-            <pointLight position={[0, 3, 0]} intensity={0.6} color="#7c3aed" distance={10} />
-            <pointLight position={[3, 2, -1]} intensity={0.3} color="#06b6d4" distance={8} />
+            <ambientLight intensity={1.0} color="#fffbf0" />
+            <directionalLight castShadow position={[5, 8, 5]} intensity={1.2} shadow-mapSize={[1024, 1024]} color="#fff8ee" />
+            <pointLight position={[0, 3, 0]} intensity={0.5} color="#fff" distance={10} />
+            <pointLight position={[3, 2, -1]} intensity={0.3} color="#D4A373" distance={8} />
+            <hemisphereLight args={["#87CEEB", "#d4cfc4", 0.4]} />
 
             <Stars radius={30} depth={20} count={1500} factor={3} saturation={0.5} fade speed={0.6} />
-            <Sparkles count={30} scale={8} size={2} speed={0.2} color="#06b6d4" opacity={0.15} />
+            <Sparkles count={30} scale={8} size={2} speed={0.2} color="#E9C46A" opacity={0.1} />
 
             {/* Reflective floor */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
@@ -113,18 +114,18 @@ function Scene() {
                     mixStrength={30}
                     roughness={1}
                     depthScale={1}
-                    color="#0c0520"
-                    metalness={0.5}
-                    mirror={0.4}
+                    color="#d4cfc4"
+                    metalness={0.3}
+                    mirror={0.3}
                 />
             </mesh>
 
             {/* Grid */}
-            <gridHelper args={[20, 20, "#7c3aed", "#7c3aed"]} position={[0, 0.01, 0]} material-opacity={0.06} material-transparent />
+            <gridHelper args={[20, 20, "#b0a89a", "#c0b8aa"]} position={[0, 0.01, 0]} material-opacity={0.15} material-transparent />
 
             {/* Walls */}
             <RoundedBox args={[6, 2, 0.12]} position={[0, 1, -2.5]} radius={0.02} smoothness={4} receiveShadow>
-                <meshStandardMaterial color="#1a0a3e" emissive="#7c3aed" emissiveIntensity={0.03} roughness={0.6} metalness={0.3} />
+                <meshStandardMaterial color="#e8e0d0" roughness={0.6} metalness={0.2} />
             </RoundedBox>
 
             {/* Screen */}
@@ -136,12 +137,12 @@ function Scene() {
             <MiniDesk position={[1.2, 0, 0.3]} />
 
             {/* Avatars */}
-            <MiniAvatar position={[-1.2, 0.6, 0.7]} name="Alex" color="#7c3aed" />
-            <MiniAvatar position={[0, 0.6, 0.7]} name="Maya" color="#06b6d4" />
-            <MiniAvatar position={[1.2, 0.6, 0.7]} name="Sam" color="#ec4899" />
+            <MiniAvatar position={[-1.2, 0.6, 0.7]} name="Alex" color="#2D6A4F" />
+            <MiniAvatar position={[0, 0.6, 0.7]} name="Maya" color="#D4A373" />
+            <MiniAvatar position={[1.2, 0.6, 0.7]} name="Sam" color="#52B788" />
 
-            {/* Teacher */}
-            <MiniAvatar position={[0, 0.6, -1.2]} name="Teacher" color="#7c3aed" />
+            {/* Guide */}
+            <MiniAvatar position={[0, 0.6, -1.2]} name="Guide" color="#2D6A4F" />
 
             {/* Plants */}
             {[[-2.5, 0, -2], [2.5, 0, -2]].map((p, i) => (
