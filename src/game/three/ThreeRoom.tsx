@@ -626,7 +626,7 @@ function PlayerController({ userName, onZoneChange, onNearChair, onNearInteracta
       const { w, a, s, d } = keys.current;
       const direction = new THREE.Vector3();
       const frontVector = new THREE.Vector3(0, 0, (s ? 1 : 0) - (w ? 1 : 0));
-      const sideVector = new THREE.Vector3((a ? 1 : 0) - (d ? 1 : 0), 0, 0);
+      const sideVector = new THREE.Vector3((d ? 1 : 0) - (a ? 1 : 0), 0, 0);
 
       direction.addVectors(frontVector, sideVector).normalize().multiplyScalar(speed * dt).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
 

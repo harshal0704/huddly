@@ -15,6 +15,7 @@ import MeetingRoomHUD from "@/components/room/MeetingRoomHUD";
 import AvatarCustomizer from "@/components/room/AvatarCustomizer";
 import { useSpacesStore } from "@/stores/spacesStore";
 import LiveKitWrapper from "@/components/room/LiveKitWrapper";
+import { useUser } from "@clerk/nextjs";
 
 const ThreeRoom = dynamic(() => import("@/game/three/ThreeRoom"), {
     ssr: false,
@@ -44,6 +45,9 @@ export default function RoomPage({ params }: RoomPageProps) {
         onlineCount: 1,
         template: "office"
     };
+
+    const { user } = useUser();
+    const userName = user?.firstName || user?.username || `Guest_${Math.floor(Math.random() * 1000)}`;
 
     // UI panel states
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -77,7 +81,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     }, []);
 
     return (
-        <LiveKitWrapper roomId={id as string} userName="You">
+        <LiveKitWrapper roomId={id as string} userName={userName}>
             <div className="relative w-screen h-screen bg-white overflow-hidden">
                 {/* Room name badge */}
                 <motion.div
@@ -118,7 +122,7 @@ export default function RoomPage({ params }: RoomPageProps) {
                 <div className="absolute inset-0 z-0">
                     <ThreeRoom
                         roomId={id as string}
-                        userName="You"
+                        userName={userName}
                         template={roomInfo.template}
                     />
                 </div>
