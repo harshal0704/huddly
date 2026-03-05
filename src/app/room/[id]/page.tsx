@@ -128,7 +128,7 @@ export default function RoomPage({ params }: RoomPageProps) {
                             <span>Sit / Interact</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-500 font-mono text-[9px]">Q</kbd>
+                            <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-500 font-mono text-[9px]">Tab</kbd>
                             <span>Toggle Mode</span>
                         </div>
                     </div>
