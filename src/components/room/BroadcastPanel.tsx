@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Radio, X, Eye, Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Users } from "lucide-react";
+import { Radio, X, Eye, Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Users, AlertCircle } from "lucide-react";
 
 import { useLocalParticipant, useTracks } from "@livekit/components-react";
 import { Track } from "livekit-client";
@@ -19,6 +19,7 @@ export default function BroadcastPanel({
     const [isLive, setIsLive] = useState(false);
     const [viewerCount, setViewerCount] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [errorMsg, setErrorMsg] = useState("");
     const videoRef = useRef<HTMLVideoElement>(null);
     const screenRef = useRef<HTMLVideoElement>(null);
 
@@ -38,37 +39,55 @@ export default function BroadcastPanel({
 
     // Attach local camera stream to video element
     useEffect(() => {
-        if (videoRef.current && localCameraTrack) {
-            localCameraTrack.attach(videoRef.current);
+        const el = videoRef.current;
+        if (el && localCameraTrack) {
+            localCameraTrack.attach(el);
         }
         return () => {
-            if (videoRef.current && localCameraTrack) {
-                localCameraTrack.detach(videoRef.current);
+            if (el && localCameraTrack) {
+                localCameraTrack.detach(el);
             }
         };
     }, [localCameraTrack, isCameraOff]);
 
     // Attach screen share stream
     useEffect(() => {
-        if (screenRef.current && localScreenTrack) {
-            localScreenTrack.attach(screenRef.current);
+        const el = screenRef.current;
+        if (el && localScreenTrack) {
+            localScreenTrack.attach(el);
         }
         return () => {
-            if (screenRef.current && localScreenTrack) {
-                localScreenTrack.detach(screenRef.current);
+            if (el && localScreenTrack) {
+                localScreenTrack.detach(el);
             }
         };
     }, [localScreenTrack]);
 
     // When going live, make sure media is started
     const handleGoLive = async () => {
-        if (isCameraOff) {
-            await localParticipant.setCameraEnabled(true);
+        try {
+            setErrorMsg("");
+            if (isCameraOff) {
+                await localParticipant.setCameraEnabled(true);
+            }
+            if (isMuted) {
+                await localParticipant.setMicrophoneEnabled(true);
+            }
+            setIsLive(true);
+        } catch (e: any) {
+            console.error("Failed to go live:", e);
+            setErrorMsg(e.message || "Failed to access camera/microphone.");
         }
-        setIsLive(true);
     };
 
-    const handleStopBroadcast = () => {
+    const handleStopBroadcast = async () => {
+        try {
+            if (isScreenSharing) await localParticipant.setScreenShareEnabled(false);
+            if (!isCameraOff) await localParticipant.setCameraEnabled(false);
+            if (!isMuted) await localParticipant.setMicrophoneEnabled(false);
+        } catch (e) {
+            console.error("Error stopping broadcast", e);
+        }
         setIsLive(false);
     };
 
@@ -108,41 +127,51 @@ export default function BroadcastPanel({
                     initial={{ opacity: 0, y: 20, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                    transition={{ type: "spring", damping: 20, stiffness: 200 }}
-                    className="fixed top-16 left-4 z-30 w-80 bg-gray-950/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-violet-500/10 flex flex-col overflow-hidden"
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    className="fixed top-16 left-4 z-30 w-80 bg-white/90 backdrop-blur-2xl rounded-3xl border border-gray-200/50 shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex flex-col overflow-hidden"
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                        <div className="flex items-center gap-2">
-                            <Radio className={`w-4 h-4 ${isLive ? "text-red-400" : "text-violet-400"}`} />
-                            <span className="text-white font-semibold text-sm">Broadcast</span>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                        <div className="flex items-center gap-2.5">
+                            <div className={`p-1.5 rounded-full ${isLive ? "bg-red-50 text-red-500" : "bg-blue-50 text-[#007AFF]"}`}>
+                                <Radio className="w-4 h-4" />
+                            </div>
+                            <span className="text-slate-900 font-semibold text-sm">Broadcaster</span>
                             {isLive && (
                                 <motion.span
                                     animate={{ opacity: [1, 0.5, 1] }}
                                     transition={{ duration: 1.5, repeat: Infinity }}
-                                    className="text-[10px] font-bold text-red-400 bg-red-500/20 px-2 py-0.5 rounded-full"
+                                    className="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full border border-red-200"
                                 >
                                     LIVE
                                 </motion.span>
                             )}
                         </div>
-                        <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                        <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
 
-                    {/* Preview area — shows real camera or screen share */}
+                    {/* Error Toast */}
+                    {errorMsg && (
+                        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                            <span className="text-xs text-red-700 leading-tight">{errorMsg}</span>
+                        </div>
+                    )}
+
+                    {/* Preview area */}
                     <div className="px-4 py-3">
-                        <div className={`relative aspect-video rounded-xl overflow-hidden ${isLive ? "ring-2 ring-red-500/50 shadow-lg shadow-red-500/10" : "ring-1 ring-white/10"
+                        <div className={`relative aspect-video rounded-2xl overflow-hidden bg-slate-100 ${isLive ? "ring-2 ring-red-500/30 shadow-[0_4px_15px_rgba(239,68,68,0.2)]" : "ring-1 ring-slate-200/50"
                             }`}>
-                            {/* Screen share takes priority when broadcasting */}
+                            {/* Screen share takes priority */}
                             {isScreenSharing && localScreenTrack ? (
                                 <video
                                     ref={screenRef}
                                     autoPlay
                                     playsInline
                                     muted
-                                    className="w-full h-full object-contain bg-black"
+                                    className="w-full h-full object-contain bg-slate-900"
                                 />
                             ) : localCameraTrack && !isCameraOff ? (
                                 <video
@@ -154,38 +183,38 @@ export default function BroadcastPanel({
                                     style={{ transform: "scaleX(-1)" }}
                                 />
                             ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                                    <div className="text-center">
-                                        <VideoOff className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                                        <span className="text-xs text-gray-500">
-                                            {localCameraTrack ? "Camera off" : "Camera not started"}
-                                        </span>
+                                <div className="w-full h-full flex flex-col items-center justify-center">
+                                    <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
+                                        <VideoOff className="w-5 h-5 text-slate-400" />
                                     </div>
+                                    <span className="text-xs font-medium text-slate-500">
+                                        {localCameraTrack ? "Camera blocked" : "Camera inactive"}
+                                    </span>
                                 </div>
                             )}
 
-                            {/* Live overlay */}
+                            {/* Live overlay stats */}
                             {isLive && (
                                 <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
                                     <motion.div
-                                        animate={{ opacity: [1, 0.6, 1] }}
+                                        animate={{ opacity: [1, 0.8, 1] }}
                                         transition={{ duration: 1.5, repeat: Infinity }}
-                                        className="flex items-center gap-1 bg-red-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                        className="flex items-center gap-1.5 bg-red-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm"
                                     >
-                                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                        <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                                         LIVE
                                     </motion.div>
-                                    <span className="text-[10px] text-white/80 bg-black/50 px-2 py-0.5 rounded-full font-mono">
+                                    <span className="text-[10px] font-medium text-slate-700 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm border border-slate-200/50">
                                         {formatDuration(duration)}
                                     </span>
                                 </div>
                             )}
 
                             {/* Screen share badge */}
-                            {isScreenSharing && isLive && (
-                                <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-blue-600/90 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
+                            {isScreenSharing && (
+                                <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-[#007AFF]/90 backdrop-blur-md text-white text-[10px] font-semibold px-2.5 py-1 rounded-full shadow-sm">
                                     <MonitorUp className="w-3 h-3" />
-                                    Screen
+                                    Screen Active
                                 </div>
                             )}
                         </div>
@@ -193,26 +222,26 @@ export default function BroadcastPanel({
 
                     {/* Stats when live */}
                     {isLive && (
-                        <div className="px-4 pb-2">
-                            <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
-                                <span className="flex items-center gap-1">
-                                    <Eye className="w-3 h-3" />
+                        <div className="px-5 pb-3">
+                            <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                                <span className="flex items-center gap-1.5">
+                                    <Eye className="w-3.5 h-3.5 text-[#007AFF]" />
                                     {viewerCount} viewers
                                 </span>
-                                <span className="flex items-center gap-1">
-                                    <Users className="w-3 h-3" />
-                                    Broadcasting to all
+                                <span className="flex items-center gap-1.5">
+                                    <Users className="w-3.5 h-3.5 text-emerald-500" />
+                                    Global Room
                                 </span>
                             </div>
                         </div>
                     )}
 
                     {/* Controls */}
-                    <div className="px-4 py-3 border-t border-white/10 space-y-3">
-                        <div className="flex items-center justify-center gap-2">
+                    <div className="px-4 py-4 border-t border-gray-100 bg-slate-50/50 space-y-3">
+                        <div className="flex items-center justify-center gap-3">
                             <button
                                 onClick={async () => await localParticipant.setMicrophoneEnabled(isMuted)}
-                                className={`p-2.5 rounded-xl transition-all ${isMuted ? "bg-red-500/20 text-red-400" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                                className={`p-3 rounded-full transition-all border shadow-sm ${isMuted ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
                                     }`}
                                 title={isMuted ? "Unmute" : "Mute"}
                             >
@@ -221,7 +250,7 @@ export default function BroadcastPanel({
 
                             <button
                                 onClick={async () => await localParticipant.setCameraEnabled(isCameraOff)}
-                                className={`p-2.5 rounded-xl transition-all ${isCameraOff ? "bg-red-500/20 text-red-400" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                                className={`p-3 rounded-full transition-all border shadow-sm ${isCameraOff ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
                                     }`}
                                 title={isCameraOff ? "Camera on" : "Camera off"}
                             >
@@ -230,7 +259,7 @@ export default function BroadcastPanel({
 
                             <button
                                 onClick={async () => await localParticipant.setScreenShareEnabled(!isScreenSharing)}
-                                className={`p-2.5 rounded-xl transition-all ${isScreenSharing ? "bg-blue-500/20 text-blue-400" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                                className={`p-3 rounded-full transition-all border shadow-sm ${isScreenSharing ? "bg-blue-50 text-[#007AFF] border-blue-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
                                     }`}
                                 title={isScreenSharing ? "Stop sharing" : "Share screen"}
                             >
@@ -242,25 +271,25 @@ export default function BroadcastPanel({
                         {!isLive ? (
                             <button
                                 onClick={handleGoLive}
-                                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
+                                className="w-full py-3 rounded-xl bg-[#007AFF] hover:bg-[#0066CC] text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-[0_4px_14px_rgba(0,122,255,0.3)] hover:shadow-[0_6px_20px_rgba(0,122,255,0.4)]"
                             >
                                 <Radio className="w-4 h-4" />
-                                Go Live
+                                Start Broadcasting
                             </button>
                         ) : (
                             <button
                                 onClick={handleStopBroadcast}
-                                className="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all border border-white/10"
+                                className="w-full py-3 rounded-xl bg-white hover:bg-red-50 text-red-600 text-sm font-semibold flex items-center justify-center gap-2 transition-all border border-red-200 shadow-sm"
                             >
-                                <StopCircle className="w-4 h-4 text-red-400" />
+                                <StopCircle className="w-4 h-4" />
                                 End Broadcast
                             </button>
                         )}
 
-                        <p className="text-[10px] text-gray-500 text-center">
+                        <p className="text-[10px] text-slate-400 text-center font-medium px-4 leading-tight">
                             {isLive
-                                ? "You are broadcasting to everyone in the room"
-                                : "Going live will broadcast your feed to all participants"
+                                ? "Your stream is visible to everyone in the room."
+                                : "Go live to project your media onto the 3D screens."
                             }
                         </p>
                     </div>
@@ -269,3 +298,4 @@ export default function BroadcastPanel({
         </AnimatePresence>
     );
 }
+

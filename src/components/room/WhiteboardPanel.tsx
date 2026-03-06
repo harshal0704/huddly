@@ -7,6 +7,7 @@ import {
     Square, Circle, Type, Download, Undo, Redo, Palette,
     StickyNote, Minus as LineIcon, Move, ZoomIn, ZoomOut,
 } from "lucide-react";
+import { useRealtimeStore } from "@/stores/realtimeStore";
 
 interface WhiteboardPanelProps {
     isOpen: boolean;
@@ -63,6 +64,10 @@ export default function WhiteboardPanel({ isOpen, onClose }: WhiteboardPanelProp
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+    const whiteboardDataUrl = useRealtimeStore(s => s.whiteboardDataUrl);
+    const updateWhiteboard = useRealtimeStore(s => s.updateWhiteboard);
+    const lastSyncedDataUrl = useRef<string | null>(null);
+
     // Initialize canvas
     useEffect(() => {
         if (!isOpen || !canvasRef.current) return;
@@ -76,32 +81,67 @@ export default function WhiteboardPanel({ isOpen, onClose }: WhiteboardPanelProp
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // Dark background
-        ctx.fillStyle = "#0f0a1a";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (whiteboardDataUrl) {
+            const img = new Image();
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0);
+                historyRef.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+                lastSyncedDataUrl.current = whiteboardDataUrl;
+            };
+            img.src = whiteboardDataUrl;
+        } else {
+            // Dark background
+            ctx.fillStyle = "#0f0a1a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Dot grid
-        ctx.fillStyle = "rgba(139, 92, 246, 0.12)";
-        for (let x = 0; x < canvas.width; x += 24) {
-            for (let y = 0; y < canvas.height; y += 24) {
-                ctx.beginPath();
-                ctx.arc(x, y, 1, 0, Math.PI * 2);
-                ctx.fill();
+            // Dot grid
+            ctx.fillStyle = "rgba(139, 92, 246, 0.12)";
+            for (let x = 0; x < canvas.width; x += 24) {
+                for (let y = 0; y < canvas.height; y += 24) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
+            historyRef.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
         }
 
-        historyRef.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
         redoRef.current = [];
-    }, [isOpen]);
+    }, [isOpen]); // Init once on open
 
-    const saveState = useCallback(() => {
+    // Listen for remote updates
+    useEffect(() => {
+        if (!isOpen || !canvasRef.current || !whiteboardDataUrl || isDrawing) return;
+        if (whiteboardDataUrl === lastSyncedDataUrl.current) return; // Prevent loop
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const img = new Image();
+        img.onload = () => {
+            if (isDrawing) return; // Double check
+            ctx.drawImage(img, 0, 0);
+            historyRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            lastSyncedDataUrl.current = whiteboardDataUrl;
+        };
+        img.src = whiteboardDataUrl;
+    }, [whiteboardDataUrl, isOpen, isDrawing]);
+
+    const saveState = useCallback((broadcast = true) => {
         if (!canvasRef.current) return;
         const ctx = canvasRef.current.getContext("2d");
         if (!ctx) return;
         historyRef.current.push(ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height));
         if (historyRef.current.length > 80) historyRef.current.shift();
         redoRef.current = [];
-    }, []);
+
+        if (broadcast) {
+            const dataUrl = canvasRef.current.toDataURL();
+            lastSyncedDataUrl.current = dataUrl;
+            updateWhiteboard(dataUrl);
+        }
+    }, [updateWhiteboard]);
 
     const undo = useCallback(() => {
         if (!canvasRef.current || historyRef.current.length <= 1) return;
@@ -110,7 +150,11 @@ export default function WhiteboardPanel({ isOpen, onClose }: WhiteboardPanelProp
         const ctx = canvasRef.current.getContext("2d");
         if (!ctx) return;
         ctx.putImageData(historyRef.current[historyRef.current.length - 1], 0, 0);
-    }, []);
+
+        const dataUrl = canvasRef.current.toDataURL();
+        lastSyncedDataUrl.current = dataUrl;
+        updateWhiteboard(dataUrl);
+    }, [updateWhiteboard]);
 
     const redo = useCallback(() => {
         if (!canvasRef.current || redoRef.current.length === 0) return;
@@ -119,7 +163,11 @@ export default function WhiteboardPanel({ isOpen, onClose }: WhiteboardPanelProp
         const ctx = canvasRef.current.getContext("2d");
         if (!ctx) return;
         ctx.putImageData(state, 0, 0);
-    }, []);
+
+        const dataUrl = canvasRef.current.toDataURL();
+        lastSyncedDataUrl.current = dataUrl;
+        updateWhiteboard(dataUrl);
+    }, [updateWhiteboard]);
 
     const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
@@ -281,8 +329,8 @@ export default function WhiteboardPanel({ isOpen, onClose }: WhiteboardPanelProp
         <button
             onClick={() => setTool(toolName)}
             className={`p-2 rounded-lg transition-all group relative ${tool === toolName
-                    ? "bg-violet-500/20 text-violet-400 shadow-lg shadow-violet-500/10"
-                    : "text-gray-400 hover:text-white hover:bg-white/10"
+                ? "bg-violet-500/20 text-violet-400 shadow-lg shadow-violet-500/10"
+                : "text-gray-400 hover:text-white hover:bg-white/10"
                 }`}
             title={label}
         >

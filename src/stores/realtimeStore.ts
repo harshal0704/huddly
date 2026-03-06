@@ -28,11 +28,13 @@ interface RealtimeState {
     players: Map<string, Player>;
     myId: string;
     chatMessages: ChatMessage[];
+    whiteboardDataUrl: string | null;
 
     connect: (serverUrl: string, userName: string, roomId: string) => void;
     disconnect: () => void;
     updatePosition: (x: number, y: number, z: number, zone: string) => void;
     sendChat: (message: string, channel: "global" | "proximity") => void;
+    updateWhiteboard: (dataUrl: string | null) => void;
 }
 
 export const useRealtimeStore = create<RealtimeState>((set, get) => ({
@@ -41,6 +43,7 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     players: new Map(),
     myId: "",
     chatMessages: [],
+    whiteboardDataUrl: null,
 
     connect: (serverUrl: string, userName: string, roomId: string) => {
         const existing = get().socket;
@@ -130,6 +133,11 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
             }));
         });
 
+        // Listen for whiteboard updates
+        socket.on("whiteboard:update", (dataUrl: string | null) => {
+            set({ whiteboardDataUrl: dataUrl });
+        });
+
         set({ socket });
     },
 
@@ -149,6 +157,12 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
     sendChat: (message: string, channel: "global" | "proximity") => {
         const { socket } = get();
         socket?.emit("chat:message", { message, channel });
+    },
+
+    updateWhiteboard: (dataUrl: string | null) => {
+        const { socket } = get();
+        set({ whiteboardDataUrl: dataUrl });
+        socket?.emit("whiteboard:update", dataUrl);
     },
 }));
 
