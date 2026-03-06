@@ -299,7 +299,7 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
   const tracks = useTracks([
     { source: Track.Source.ScreenShare, withPlaceholder: false },
     { source: Track.Source.Camera, withPlaceholder: false }
-  ], { onlySubscribed: true });
+  ], { onlySubscribed: false });
 
   const activeTrack = tracks.find(t => t.source === Track.Source.ScreenShare) || tracks[0];
 
@@ -391,28 +391,54 @@ function ReceptionDesk({ position }: { position: [number, number, number] }) {
 /* ═══════════════════════════════════════════════════════════════
    AVATAR (enhanced)
    ═══════════════════════════════════════════════════════════════ */
-function Avatar({ color, name, cameraTrack }: { color: string; name: string; cameraTrack?: any }) {
+function Avatar({ color, name, cameraTrack, audioTrack }: { color: string; name: string; cameraTrack?: any; audioTrack?: any }) {
   const ref = useRef<THREE.Group>(null);
   const videoRef = useRef<HTMLDivElement>(null);
+  const audioHtmlRef = useRef<HTMLAudioElement>(null);
   const { camera } = useThree();
 
+  useEffect(() => {
+    if (audioHtmlRef.current && audioTrack?.publication?.track) {
+      audioTrack.publication.track.attach(audioHtmlRef.current);
+    }
+    return () => {
+      if (audioHtmlRef.current && audioTrack?.publication?.track) {
+        audioTrack.publication.track.detach(audioHtmlRef.current);
+      }
+    };
+  }, [audioTrack]);
+
   useFrame(() => {
-    if (ref.current && videoRef.current) {
+    if (ref.current) {
       const worldPos = new THREE.Vector3();
       ref.current.getWorldPosition(worldPos);
       const dist = camera.position.distanceTo(worldPos);
-      if (dist < 8) {
-        videoRef.current.style.opacity = "1";
-        videoRef.current.style.transform = "scale(1)";
-      } else {
-        videoRef.current.style.opacity = "0";
-        videoRef.current.style.transform = "scale(0.5)";
+
+      // Video fading
+      if (videoRef.current) {
+        if (dist < 8) {
+          videoRef.current.style.opacity = "1";
+          videoRef.current.style.transform = "scale(1)";
+        } else {
+          videoRef.current.style.opacity = "0";
+          videoRef.current.style.transform = "scale(0.5)";
+        }
+      }
+
+      // Proximity Audio Attenuation (Linear Rolloff)
+      if (audioHtmlRef.current) {
+        const minDist = 2; // Full volume up to 2 units away
+        const maxDist = 20; // Zero volume at 20 units away
+        const volume = Math.max(0, Math.min(1, 1 - (dist - minDist) / (maxDist - minDist)));
+        audioHtmlRef.current.volume = volume;
       }
     }
   });
 
   return (
     <group ref={ref}>
+      {/* Hidden audio element for spatial proximity sound */}
+      <Html><audio ref={audioHtmlRef} autoPlay playsInline /></Html>
       {/* ── Torso */}
       <mesh position={[0, -0.1, 0]} castShadow>
         <capsuleGeometry args={[0.18, 0.38, 16, 16]} />
@@ -858,19 +884,43 @@ function WallClock({ position, rotation = [0, 0, 0] as [number, number, number] 
 }
 
 function Whiteboard({ position, rotation = [0, 0, 0] as [number, number, number] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
+  const whiteboardDataUrl = useRealtimeStore(s => s.whiteboardDataUrl);
+
+  const texture = useMemo(() => {
+    if (!whiteboardDataUrl) return null;
+    const img = new Image();
+    img.src = whiteboardDataUrl;
+    const tex = new THREE.Texture(img);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    img.onload = () => {
+      tex.needsUpdate = true;
+    };
+    return tex;
+  }, [whiteboardDataUrl]);
+
   return (
     <group position={position} rotation={rotation}>
       <RoundedBox args={[2.5, 1.6, 0.06]} radius={0.03} smoothness={4}>
-        <meshStandardMaterial color="#fafafa" roughness={0.3} />
+        <meshStandardMaterial color="#0f0a1a" roughness={0.8} />
       </RoundedBox>
-      {/* Colored marker lines */}
-      {[[0.3, 0.3, "#e74c3c"], [-0.5, -0.1, "#3498db"], [0.1, -0.4, "#2ecc71"]].map(([x, y, c], i) => (
-        <mesh key={i} position={[x as number, y as number, 0.04]}>
-          <boxGeometry args={[0.8, 0.04, 0.01]} />
-          <meshStandardMaterial color={c as string} />
+
+      {texture ? (
+        <mesh position={[0, 0, 0.032]}>
+          <planeGeometry args={[2.46, 1.56]} />
+          <meshBasicMaterial map={texture} />
         </mesh>
-      ))}
-      <Text position={[0, 0.6, 0.04]} fontSize={0.08} color="#666" anchorX="center">Sprint Goals</Text>
+      ) : (
+        <group>
+          {/* Colored marker lines placeholder */}
+          {[[0.3, 0.3, "#e74c3c"], [-0.5, -0.1, "#3498db"], [0.1, -0.4, "#2ecc71"]].map(([x, y, c], i) => (
+            <mesh key={i} position={[x as number, y as number, 0.04]}>
+              <boxGeometry args={[0.8, 0.04, 0.01]} />
+              <meshStandardMaterial color={c as string} />
+            </mesh>
+          ))}
+          <Text position={[0, 0.6, 0.04]} fontSize={0.08} color="#666" anchorX="center">Shared Whiteboard</Text>
+        </group>
+      )}
     </group>
   );
 }
@@ -1763,8 +1813,9 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
   const myId = useRealtimeStore(s => s.myId);
 
   const tracks = useTracks([
-    { source: Track.Source.Camera, withPlaceholder: false }
-  ], { onlySubscribed: true });
+    { source: Track.Source.Camera, withPlaceholder: false },
+    { source: Track.Source.Microphone, withPlaceholder: false }
+  ], { onlySubscribed: false });
 
   return (
     <>
@@ -1790,10 +1841,11 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
       {/* Render live players */}
       {Array.from(players.values()).map(p => {
         if (p.id === myId) return null;
-        const pTrack = tracks.find(t => t.participant.identity === p.name);
+        const pCamTrack = tracks.find(t => t.participant.name === p.name && t.source === Track.Source.Camera);
+        const pMicTrack = tracks.find(t => t.participant.name === p.name && t.source === Track.Source.Microphone);
         return (
           <group key={p.id} position={[p.x, p.y, p.z]}>
-            <Avatar color={p.color} name={p.name} cameraTrack={pTrack} />
+            <Avatar color={p.color} name={p.name} cameraTrack={pCamTrack} audioTrack={pMicTrack} />
           </group>
         );
       })}
