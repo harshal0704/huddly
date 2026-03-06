@@ -439,138 +439,50 @@ function Avatar({ color, name, cameraTrack, audioTrack }: { color: string; name:
     <group ref={ref}>
       {/* Hidden audio element for spatial proximity sound */}
       <Html><audio ref={audioHtmlRef} autoPlay playsInline /></Html>
-      {/* ── Torso */}
-      <mesh position={[0, -0.1, 0]} castShadow>
-        <capsuleGeometry args={[0.18, 0.38, 16, 16]} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0.15} />
-      </mesh>
-      {/* ── Collar / neckline */}
-      <mesh position={[0, 0.12, 0.08]}>
-        <torusGeometry args={[0.1, 0.025, 8, 16, Math.PI]} />
-        <meshStandardMaterial color={color} roughness={0.5} />
-      </mesh>
-      {/* ── Badge / pin on chest */}
-      <mesh position={[-0.1, 0.0, 0.18]}>
-        <circleGeometry args={[0.04, 16]} />
-        <meshStandardMaterial color="#FFD700" emissive="#FFD700" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
-      </mesh>
-      {/* ── Neck */}
-      <mesh position={[0, 0.16, 0]} castShadow>
-        <cylinderGeometry args={[0.06, 0.08, 0.08, 12]} />
-        <meshStandardMaterial color={P.skin} roughness={0.4} />
+      {/* ── Body (rounded capsule) */}
+      <mesh position={[0, -0.15, 0]} castShadow>
+        <capsuleGeometry args={[0.2, 0.45, 16, 16]} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0.1} />
       </mesh>
       {/* ── Head */}
       <mesh position={[0, 0.3, 0]} castShadow>
-        <sphereGeometry args={[0.19, 32, 32]} />
-        <meshStandardMaterial color={P.skin} roughness={0.3} />
+        <sphereGeometry args={[0.2, 32, 32]} />
+        <meshStandardMaterial color="#fce4d6" roughness={0.4} />
       </mesh>
-      {/* ── Hair on top */}
-      <mesh position={[0, 0.44, -0.03]}>
-        <sphereGeometry args={[0.14, 20, 16]} />
-        <meshStandardMaterial color={color} roughness={0.6} />
-      </mesh>
-      {/* ── Hair fringe (front) */}
-      <mesh position={[0, 0.42, 0.08]}>
-        <boxGeometry args={[0.22, 0.06, 0.08]} />
-        <meshStandardMaterial color={color} roughness={0.6} />
-      </mesh>
-      {/* ── Eyes (white sclera + dark pupil) */}
-      <mesh position={[-0.065, 0.32, 0.155]}>
+      {/* ── Left eye */}
+      <mesh position={[-0.07, 0.33, 0.17]}>
         <sphereGeometry args={[0.035, 12, 12]} />
-        <meshStandardMaterial color="#f5f5f5" roughness={0.3} />
+        <meshStandardMaterial color="#222" />
       </mesh>
-      <mesh position={[-0.065, 0.32, 0.18]}>
-        <sphereGeometry args={[0.02, 10, 10]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-      <mesh position={[0.065, 0.32, 0.155]}>
+      {/* ── Right eye */}
+      <mesh position={[0.07, 0.33, 0.17]}>
         <sphereGeometry args={[0.035, 12, 12]} />
-        <meshStandardMaterial color="#f5f5f5" roughness={0.3} />
+        <meshStandardMaterial color="#222" />
       </mesh>
-      <mesh position={[0.065, 0.32, 0.18]}>
-        <sphereGeometry args={[0.02, 10, 10]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-      {/* ── Eyebrows */}
-      <mesh position={[-0.065, 0.37, 0.16]}>
-        <boxGeometry args={[0.06, 0.015, 0.02]} />
-        <meshStandardMaterial color="#333" />
-      </mesh>
-      <mesh position={[0.065, 0.37, 0.16]}>
-        <boxGeometry args={[0.06, 0.015, 0.02]} />
-        <meshStandardMaterial color="#333" />
-      </mesh>
-      {/* ── Nose */}
-      <mesh position={[0, 0.27, 0.18]}>
-        <sphereGeometry args={[0.025, 10, 10]} />
-        <meshStandardMaterial color={P.skin} roughness={0.4} />
-      </mesh>
-      {/* ── Mouth (smile) */}
-      <mesh position={[0, 0.22, 0.17]}>
-        <torusGeometry args={[0.035, 0.008, 8, 12, Math.PI]} />
-        <meshStandardMaterial color="#c0392b" roughness={0.5} />
-      </mesh>
-      {/* ── Shoulders / upper arms */}
-      <mesh position={[-0.24, -0.02, 0]} castShadow>
-        <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial color={color} roughness={0.4} />
-      </mesh>
-      <mesh position={[0.24, -0.02, 0]} castShadow>
-        <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial color={color} roughness={0.4} />
+      {/* ── Smile */}
+      <mesh position={[0, 0.24, 0.18]}>
+        <torusGeometry args={[0.04, 0.008, 8, 12, Math.PI]} />
+        <meshStandardMaterial color="#c0392b" />
       </mesh>
       {/* ── Left arm */}
-      <mesh position={[-0.24, -0.18, 0]} rotation={[0, 0, 0.12]} castShadow>
-        <capsuleGeometry args={[0.05, 0.28, 8, 8]} />
-        <meshStandardMaterial color={color} roughness={0.4} />
-      </mesh>
-      {/* ── Left hand */}
-      <mesh position={[-0.26, -0.36, 0.02]}>
-        <sphereGeometry args={[0.04, 10, 10]} />
-        <meshStandardMaterial color={P.skin} roughness={0.4} />
+      <mesh position={[-0.25, -0.12, 0]} rotation={[0, 0, 0.15]} castShadow>
+        <capsuleGeometry args={[0.05, 0.25, 8, 8]} />
+        <meshStandardMaterial color={color} roughness={0.35} />
       </mesh>
       {/* ── Right arm */}
-      <mesh position={[0.24, -0.18, 0]} rotation={[0, 0, -0.12]} castShadow>
-        <capsuleGeometry args={[0.05, 0.28, 8, 8]} />
-        <meshStandardMaterial color={color} roughness={0.4} />
-      </mesh>
-      {/* ── Right hand */}
-      <mesh position={[0.26, -0.36, 0.02]}>
-        <sphereGeometry args={[0.04, 10, 10]} />
-        <meshStandardMaterial color={P.skin} roughness={0.4} />
-      </mesh>
-      {/* ── Belt */}
-      <mesh position={[0, -0.32, 0]}>
-        <cylinderGeometry args={[0.18, 0.18, 0.04, 16]} />
-        <meshStandardMaterial color="#2c2c2c" roughness={0.4} metalness={0.5} />
+      <mesh position={[0.25, -0.12, 0]} rotation={[0, 0, -0.15]} castShadow>
+        <capsuleGeometry args={[0.05, 0.25, 8, 8]} />
+        <meshStandardMaterial color={color} roughness={0.35} />
       </mesh>
       {/* ── Left leg */}
-      <mesh position={[-0.09, -0.52, 0]} castShadow>
-        <capsuleGeometry args={[0.065, 0.22, 8, 8]} />
-        <meshStandardMaterial color="#2c3e50" roughness={0.5} />
+      <mesh position={[-0.08, -0.52, 0]} castShadow>
+        <capsuleGeometry args={[0.055, 0.2, 8, 8]} />
+        <meshStandardMaterial color="#34495e" roughness={0.5} />
       </mesh>
       {/* ── Right leg */}
-      <mesh position={[0.09, -0.52, 0]} castShadow>
-        <capsuleGeometry args={[0.065, 0.22, 8, 8]} />
-        <meshStandardMaterial color="#2c3e50" roughness={0.5} />
-      </mesh>
-      {/* ── Shoes */}
-      <mesh position={[-0.09, -0.68, 0.04]}>
-        <boxGeometry args={[0.11, 0.07, 0.18]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.2} metalness={0.3} />
-      </mesh>
-      <mesh position={[0.09, -0.68, 0.04]}>
-        <boxGeometry args={[0.11, 0.07, 0.18]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.2} metalness={0.3} />
-      </mesh>
-      {/* ── Shoe soles */}
-      <mesh position={[-0.09, -0.72, 0.04]}>
-        <boxGeometry args={[0.12, 0.02, 0.19]} />
-        <meshStandardMaterial color="#333" roughness={0.8} />
-      </mesh>
-      <mesh position={[0.09, -0.72, 0.04]}>
-        <boxGeometry args={[0.12, 0.02, 0.19]} />
-        <meshStandardMaterial color="#333" roughness={0.8} />
+      <mesh position={[0.08, -0.52, 0]} castShadow>
+        <capsuleGeometry args={[0.055, 0.2, 8, 8]} />
+        <meshStandardMaterial color="#34495e" roughness={0.5} />
       </mesh>
       {/* ── Proximity ring (glowing) */}
       <mesh position={[0, -0.72, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -743,12 +655,25 @@ function PlayerController({ userName, onZoneChange, onNearChair, onNearInteracta
       if (k in keys.current) (keys.current as any)[k] = true;
       if (k === "e" && ref.current) {
         const px = ref.current.position.x, pz = ref.current.position.z;
-        // Check chair interaction
-        const nearSeat = CHAIR_POSITIONS.some(([cx, cz]) => Math.abs(px - cx) < 1.5 && Math.abs(pz - cz) < 1.5);
-        if (nearSeat) {
+        // Check chair interaction — find closest chair and teleport
+        let closestChair: [number, number] | null = null;
+        let closestChairDist = Infinity;
+        for (const [cx, cz] of CHAIR_POSITIONS) {
+          const d = Math.sqrt((px - cx) ** 2 + (pz - cz) ** 2);
+          if (d < 1.5 && d < closestChairDist) {
+            closestChairDist = d;
+            closestChair = [cx, cz];
+          }
+        }
+        if (closestChair) {
           isSitting.current = !isSitting.current;
-          if (isSitting.current) ref.current.position.y = 0.3;
-          else ref.current.position.y = 0.6;
+          if (isSitting.current) {
+            // Teleport to the chair and sit
+            ref.current.position.set(closestChair[0], 0.3, closestChair[1]);
+          } else {
+            // Stand up
+            ref.current.position.y = 0.6;
+          }
         }
         // Check interactable objects
         for (const obj of INTERACTABLES) {

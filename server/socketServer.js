@@ -141,6 +141,12 @@ io.on("connection", (socket) => {
         });
     });
 
+    // ── Whiteboard sync ─────────────────────────────────
+    socket.on("whiteboard:update", (dataUrl) => {
+        // Relay the whiteboard canvas to all other players in the room
+        socket.to(room).emit("whiteboard:update", dataUrl);
+    });
+
     // ── Meeting zone tracking ───────────────────────────
     socket.on("meeting:join", (meetingZone) => {
         if (!meetingZone) return;
