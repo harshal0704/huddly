@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
         at.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true });
 
-        const token = at.toJwt();
+        const token = await at.toJwt();
 
         return NextResponse.json({ token, identity: participantIdentity, name: participantName });
     } catch (error: any) {

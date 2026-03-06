@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 
@@ -17,48 +17,64 @@ export default function LiveKitWrapper({ roomId, userName, children }: LiveKitWr
     const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "";
     const retryCountRef = useRef(0);
     const maxRetries = 5;
+    const mountedRef = useRef(true);
+
+    const fetchToken = useCallback(async () => {
+        try {
+            if (mountedRef.current) setError(null);
+            const res = await fetch(`/api/livekit?room=${roomId}&username=${encodeURIComponent(userName || "Guest")}`);
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+                throw new Error(errData.error || `HTTP ${res.status}`);
+            }
+
+            const data = await res.json();
+
+            if (mountedRef.current && data.token) {
+                setToken(data.token);
+                setIsReconnecting(false);
+                retryCountRef.current = 0;
+                console.log("[LiveKit] Token fetched successfully");
+            } else if (data.error) {
+                throw new Error(data.error);
+            }
+        } catch (e: any) {
+            console.error("[LiveKit] Token fetch failed:", e.message);
+
+            if (mountedRef.current && retryCountRef.current < maxRetries) {
+                const backoffMs = Math.min(1000 * Math.pow(2, retryCountRef.current), 10000);
+                retryCountRef.current += 1;
+                console.log(`[LiveKit] Retrying in ${backoffMs}ms (attempt ${retryCountRef.current}/${maxRetries})`);
+                setTimeout(() => {
+                    if (mountedRef.current) fetchToken();
+                }, backoffMs);
+            } else if (mountedRef.current) {
+                setError("Failed to connect to media server after multiple attempts.");
+                setIsReconnecting(false);
+            }
+        }
+    }, [roomId, userName]);
 
     useEffect(() => {
-        let mounted = true;
-        let timeoutId: NodeJS.Timeout;
-
-        const fetchToken = async () => {
-            try {
-                if (mounted) setError(null);
-                const res = await fetch(`/api/livekit?room=${roomId}&username=${encodeURIComponent(userName || "Guest")}`);
-                const data = await res.json();
-
-                if (mounted && data.token) {
-                    setToken(data.token);
-                    retryCountRef.current = 0; // Reset on success
-                } else if (data.error) {
-                    if (mounted) setError(data.error);
-                    console.error("LiveKit token error:", data.error);
-                }
-            } catch (e) {
-                console.error("Failed to fetch LiveKit token", e);
-
-                // Exponential backoff
-                if (mounted && retryCountRef.current < maxRetries) {
-                    const backoffMs = Math.min(1000 * Math.pow(2, retryCountRef.current), 10000);
-                    retryCountRef.current += 1;
-                    console.log(`Retrying token fetch in ${backoffMs}ms (Attempt ${retryCountRef.current}/${maxRetries})`);
-                    timeoutId = setTimeout(fetchToken, backoffMs);
-                } else if (mounted) {
-                    setError("Failed to connect to media server after multiple attempts.");
-                }
-            }
-        };
-
+        mountedRef.current = true;
         if (serverUrl) {
             fetchToken();
         }
-
         return () => {
-            mounted = false;
-            clearTimeout(timeoutId);
+            mountedRef.current = false;
         };
-    }, [roomId, userName, serverUrl]);
+    }, [roomId, userName, serverUrl, fetchToken]);
+
+    const handleDisconnected = useCallback(() => {
+        console.log("[LiveKit] Disconnected — will re-fetch token");
+        setIsReconnecting(true);
+        retryCountRef.current = 0;
+        // Re-fetch a fresh token after a short delay
+        setTimeout(() => {
+            if (mountedRef.current) fetchToken();
+        }, 2000);
+    }, [fetchToken]);
 
     if (!serverUrl) {
         return (
@@ -77,7 +93,11 @@ export default function LiveKitWrapper({ roomId, userName, children }: LiveKitWr
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[100] px-5 py-4 rounded-2xl bg-red-50/90 backdrop-blur-xl border border-red-200 shadow-2xl text-red-800 text-sm font-medium max-w-sm text-center flex flex-col items-center gap-3">
                     <span>{error}</span>
                     <button
-                        onClick={() => window.location.reload()}
+                        onClick={() => {
+                            setError(null);
+                            retryCountRef.current = 0;
+                            fetchToken();
+                        }}
                         className="px-4 py-1.5 bg-white rounded-full text-red-600 font-semibold hover:bg-red-50 transition-colors shadow-sm ring-1 ring-red-100"
                     >
                         Retry Connection
@@ -117,10 +137,13 @@ export default function LiveKitWrapper({ roomId, userName, children }: LiveKitWr
                     autoSubscribe: true,
                     maxRetries: 5,
                 }}
-                onConnected={() => setIsReconnecting(false)}
-                onDisconnected={() => {
-                    console.log("LiveKit disconnected");
-                    setIsReconnecting(true);
+                onConnected={() => {
+                    console.log("[LiveKit] Connected successfully");
+                    setIsReconnecting(false);
+                }}
+                onDisconnected={handleDisconnected}
+                onError={(err) => {
+                    console.error("[LiveKit] Room error:", err);
                 }}
             >
                 {children}
