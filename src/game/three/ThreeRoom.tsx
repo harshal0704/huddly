@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Text, RoundedBox, Float, Sparkles, Sky, Html, PointerLockControls, Billboard } from "@react-three/drei";
+import { Text, RoundedBox, Float, Sparkles, Sky, Html, Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import { useRealtimeStore } from "@/stores/realtimeStore";
 import { useTracks, ParticipantTile } from "@livekit/components-react";
@@ -153,9 +153,9 @@ function StandingDesk({ position }: { position: [number, number, number] }) {
   );
 }
 
-function Chair({ position, color = P.chair }: { position: [number, number, number]; color?: string }) {
+function Chair({ position, rotation = [0, 0, 0] as [number, number, number], color = P.chair }: { position: [number, number, number]; rotation?: [number, number, number]; color?: string }) {
   return (
-    <group position={position}>
+    <group position={position} rotation={rotation}>
       <mesh position={[0, 0.45, 0]}><boxGeometry args={[0.5, 0.08, 0.5]} /><meshStandardMaterial color={color} /></mesh>
       <mesh position={[0, 0.7, -0.22]}><boxGeometry args={[0.5, 0.5, 0.06]} /><meshStandardMaterial color={color} /></mesh>
       <mesh position={[0, 0.22, 0]}><cylinderGeometry args={[0.03, 0.03, 0.44, 6]} /><meshStandardMaterial color="#333" metalness={0.8} /></mesh>
@@ -389,7 +389,7 @@ function ReceptionDesk({ position }: { position: [number, number, number] }) {
    ═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════
-   AVATAR
+   AVATAR (enhanced)
    ═══════════════════════════════════════════════════════════════ */
 function Avatar({ color, name, cameraTrack }: { color: string; name: string; cameraTrack?: any }) {
   const ref = useRef<THREE.Group>(null);
@@ -413,62 +413,142 @@ function Avatar({ color, name, cameraTrack }: { color: string; name: string; cam
 
   return (
     <group ref={ref}>
-      {/* ── Body (torso) */}
-      <mesh position={[0, -0.15, 0]} castShadow>
-        <capsuleGeometry args={[0.16, 0.35, 12, 12]} />
-        <meshStandardMaterial color={color} roughness={0.4} metalness={0.15} />
+      {/* ── Torso */}
+      <mesh position={[0, -0.1, 0]} castShadow>
+        <capsuleGeometry args={[0.18, 0.38, 16, 16]} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0.15} />
+      </mesh>
+      {/* ── Collar / neckline */}
+      <mesh position={[0, 0.12, 0.08]}>
+        <torusGeometry args={[0.1, 0.025, 8, 16, Math.PI]} />
+        <meshStandardMaterial color={color} roughness={0.5} />
+      </mesh>
+      {/* ── Badge / pin on chest */}
+      <mesh position={[-0.1, 0.0, 0.18]}>
+        <circleGeometry args={[0.04, 16]} />
+        <meshStandardMaterial color="#FFD700" emissive="#FFD700" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+      </mesh>
+      {/* ── Neck */}
+      <mesh position={[0, 0.16, 0]} castShadow>
+        <cylinderGeometry args={[0.06, 0.08, 0.08, 12]} />
+        <meshStandardMaterial color={P.skin} roughness={0.4} />
       </mesh>
       {/* ── Head */}
-      <mesh position={[0, 0.28, 0]} castShadow>
-        <sphereGeometry args={[0.18, 24, 24]} />
+      <mesh position={[0, 0.3, 0]} castShadow>
+        <sphereGeometry args={[0.19, 32, 32]} />
         <meshStandardMaterial color={P.skin} roughness={0.3} />
       </mesh>
-      {/* ── Hair/bun on top */}
-      <mesh position={[0, 0.42, -0.02]}>
-        <sphereGeometry args={[0.12, 16, 16]} />
+      {/* ── Hair on top */}
+      <mesh position={[0, 0.44, -0.03]}>
+        <sphereGeometry args={[0.14, 20, 16]} />
         <meshStandardMaterial color={color} roughness={0.6} />
       </mesh>
-      {/* ── Eyes */}
-      <mesh position={[-0.06, 0.3, 0.15]}>
-        <sphereGeometry args={[0.025, 8, 8]} />
-        <meshStandardMaterial color="#222" />
+      {/* ── Hair fringe (front) */}
+      <mesh position={[0, 0.42, 0.08]}>
+        <boxGeometry args={[0.22, 0.06, 0.08]} />
+        <meshStandardMaterial color={color} roughness={0.6} />
       </mesh>
-      <mesh position={[0.06, 0.3, 0.15]}>
-        <sphereGeometry args={[0.025, 8, 8]} />
-        <meshStandardMaterial color="#222" />
+      {/* ── Eyes (white sclera + dark pupil) */}
+      <mesh position={[-0.065, 0.32, 0.155]}>
+        <sphereGeometry args={[0.035, 12, 12]} />
+        <meshStandardMaterial color="#f5f5f5" roughness={0.3} />
+      </mesh>
+      <mesh position={[-0.065, 0.32, 0.18]}>
+        <sphereGeometry args={[0.02, 10, 10]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[0.065, 0.32, 0.155]}>
+        <sphereGeometry args={[0.035, 12, 12]} />
+        <meshStandardMaterial color="#f5f5f5" roughness={0.3} />
+      </mesh>
+      <mesh position={[0.065, 0.32, 0.18]}>
+        <sphereGeometry args={[0.02, 10, 10]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      {/* ── Eyebrows */}
+      <mesh position={[-0.065, 0.37, 0.16]}>
+        <boxGeometry args={[0.06, 0.015, 0.02]} />
+        <meshStandardMaterial color="#333" />
+      </mesh>
+      <mesh position={[0.065, 0.37, 0.16]}>
+        <boxGeometry args={[0.06, 0.015, 0.02]} />
+        <meshStandardMaterial color="#333" />
+      </mesh>
+      {/* ── Nose */}
+      <mesh position={[0, 0.27, 0.18]}>
+        <sphereGeometry args={[0.025, 10, 10]} />
+        <meshStandardMaterial color={P.skin} roughness={0.4} />
+      </mesh>
+      {/* ── Mouth (smile) */}
+      <mesh position={[0, 0.22, 0.17]}>
+        <torusGeometry args={[0.035, 0.008, 8, 12, Math.PI]} />
+        <meshStandardMaterial color="#c0392b" roughness={0.5} />
+      </mesh>
+      {/* ── Shoulders / upper arms */}
+      <mesh position={[-0.24, -0.02, 0]} castShadow>
+        <sphereGeometry args={[0.07, 12, 12]} />
+        <meshStandardMaterial color={color} roughness={0.4} />
+      </mesh>
+      <mesh position={[0.24, -0.02, 0]} castShadow>
+        <sphereGeometry args={[0.07, 12, 12]} />
+        <meshStandardMaterial color={color} roughness={0.4} />
       </mesh>
       {/* ── Left arm */}
-      <mesh position={[-0.22, -0.12, 0]} rotation={[0, 0, 0.15]} castShadow>
-        <capsuleGeometry args={[0.05, 0.25, 8, 8]} />
+      <mesh position={[-0.24, -0.18, 0]} rotation={[0, 0, 0.12]} castShadow>
+        <capsuleGeometry args={[0.05, 0.28, 8, 8]} />
         <meshStandardMaterial color={color} roughness={0.4} />
+      </mesh>
+      {/* ── Left hand */}
+      <mesh position={[-0.26, -0.36, 0.02]}>
+        <sphereGeometry args={[0.04, 10, 10]} />
+        <meshStandardMaterial color={P.skin} roughness={0.4} />
       </mesh>
       {/* ── Right arm */}
-      <mesh position={[0.22, -0.12, 0]} rotation={[0, 0, -0.15]} castShadow>
-        <capsuleGeometry args={[0.05, 0.25, 8, 8]} />
+      <mesh position={[0.24, -0.18, 0]} rotation={[0, 0, -0.12]} castShadow>
+        <capsuleGeometry args={[0.05, 0.28, 8, 8]} />
         <meshStandardMaterial color={color} roughness={0.4} />
       </mesh>
+      {/* ── Right hand */}
+      <mesh position={[0.26, -0.36, 0.02]}>
+        <sphereGeometry args={[0.04, 10, 10]} />
+        <meshStandardMaterial color={P.skin} roughness={0.4} />
+      </mesh>
+      {/* ── Belt */}
+      <mesh position={[0, -0.32, 0]}>
+        <cylinderGeometry args={[0.18, 0.18, 0.04, 16]} />
+        <meshStandardMaterial color="#2c2c2c" roughness={0.4} metalness={0.5} />
+      </mesh>
       {/* ── Left leg */}
-      <mesh position={[-0.08, -0.5, 0]} castShadow>
-        <capsuleGeometry args={[0.06, 0.2, 8, 8]} />
+      <mesh position={[-0.09, -0.52, 0]} castShadow>
+        <capsuleGeometry args={[0.065, 0.22, 8, 8]} />
         <meshStandardMaterial color="#2c3e50" roughness={0.5} />
       </mesh>
       {/* ── Right leg */}
-      <mesh position={[0.08, -0.5, 0]} castShadow>
-        <capsuleGeometry args={[0.06, 0.2, 8, 8]} />
+      <mesh position={[0.09, -0.52, 0]} castShadow>
+        <capsuleGeometry args={[0.065, 0.22, 8, 8]} />
         <meshStandardMaterial color="#2c3e50" roughness={0.5} />
       </mesh>
       {/* ── Shoes */}
-      <mesh position={[-0.08, -0.65, 0.03]}>
-        <boxGeometry args={[0.1, 0.06, 0.16]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.3} />
+      <mesh position={[-0.09, -0.68, 0.04]}>
+        <boxGeometry args={[0.11, 0.07, 0.18]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.2} metalness={0.3} />
       </mesh>
-      <mesh position={[0.08, -0.65, 0.03]}>
-        <boxGeometry args={[0.1, 0.06, 0.16]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.3} />
+      <mesh position={[0.09, -0.68, 0.04]}>
+        <boxGeometry args={[0.11, 0.07, 0.18]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.2} metalness={0.3} />
+      </mesh>
+      {/* ── Shoe soles */}
+      <mesh position={[-0.09, -0.72, 0.04]}>
+        <boxGeometry args={[0.12, 0.02, 0.19]} />
+        <meshStandardMaterial color="#333" roughness={0.8} />
+      </mesh>
+      <mesh position={[0.09, -0.72, 0.04]}>
+        <boxGeometry args={[0.12, 0.02, 0.19]} />
+        <meshStandardMaterial color="#333" roughness={0.8} />
       </mesh>
       {/* ── Proximity ring (glowing) */}
-      <mesh position={[0, -0.67, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.28, 0.38, 32]} />
+      <mesh position={[0, -0.72, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.3, 0.42, 32]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
       {/* ── Floating Name Billboard */}
@@ -555,15 +635,34 @@ const INTERACTABLES: { type: string; position: [number, number, number]; radius:
   { type: "watercooler", position: [18, 0, 10], radius: 2, prompt: "💧 Water Break" },
 ];
 
-function PlayerController({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, fpsMode }: {
+/* ═══════════════════════════════════════════════════════════════
+   PER-TEMPLATE SPAWN POSITIONS
+   ═══════════════════════════════════════════════════════════════ */
+const TEMPLATE_SPAWNS: Record<string, [number, number, number]> = {
+  office: [0, 0.6, 24],
+  cafe: [0, 0.6, 4],
+  party: [0, 0.6, 4],
+  classroom: [0, 0.6, 12],
+  conference: [0, 0.6, 16],
+  library: [0, 0.6, 12],
+  gaming: [0, 0.6, 12],
+  rooftop: [0, 0.6, 12],
+  theater: [0, 0.6, 12],
+  blank: [0, 0.6, 12],
+  custom: [0, 0.6, 12],
+};
+
+function PlayerController({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, fpsMode, onFpsModeChange, template = "office" }: {
   userName: string;
   onZoneChange: (z: string) => void;
   onNearChair: (near: boolean) => void;
   onNearInteractable: (interactable: { type: string; prompt: string } | null) => void;
   onInteract: (type: string) => void;
   fpsMode: boolean;
+  onFpsModeChange: (fps: boolean) => void;
+  template?: string;
 }) {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const ref = useRef<THREE.Group>(null);
   const keys = useRef({ w: false, a: false, s: false, d: false });
   const speed = 6;
@@ -571,20 +670,46 @@ function PlayerController({ userName, onZoneChange, onNearChair, onNearInteracta
   const isSitting = useRef(false);
   const lastNearChair = useRef(false);
   const lastInteractable = useRef<string | null>(null);
-  const controlsRef = useRef<any>(null);
+  const yawRef = useRef(0);
+  const pitchRef = useRef(0);
 
   const updatePosition = useRealtimeStore(s => s.updatePosition);
 
-  // Lock/unlock pointer based on fpsMode
+  // Manual pointer lock & unlock
   useEffect(() => {
-    if (controlsRef.current) {
-      if (fpsMode) {
-        controlsRef.current.lock();
-      } else {
-        controlsRef.current.unlock();
+    if (fpsMode) {
+      gl.domElement.requestPointerLock();
+    } else {
+      if (document.pointerLockElement === gl.domElement) {
+        document.exitPointerLock();
       }
     }
-  }, [fpsMode]);
+  }, [fpsMode, gl.domElement]);
+
+  // Sync pointer lock state changes back to fpsMode
+  useEffect(() => {
+    const onLockChange = () => {
+      const isLocked = document.pointerLockElement === gl.domElement;
+      if (!isLocked && fpsMode) {
+        onFpsModeChange(false);
+      }
+    };
+    document.addEventListener("pointerlockchange", onLockChange);
+    return () => document.removeEventListener("pointerlockchange", onLockChange);
+  }, [fpsMode, gl.domElement, onFpsModeChange]);
+
+  // Manual mouse look when pointer is locked
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (document.pointerLockElement !== gl.domElement) return;
+      const sensitivity = 0.002;
+      yawRef.current -= e.movementX * sensitivity;
+      pitchRef.current -= e.movementY * sensitivity;
+      pitchRef.current = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, pitchRef.current));
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    return () => document.removeEventListener("mousemove", onMouseMove);
+  }, [gl.domElement]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -648,7 +773,7 @@ function PlayerController({ userName, onZoneChange, onNearChair, onNearInteracta
       const frontVector = new THREE.Vector3(0, 0, (s ? 1 : 0) - (w ? 1 : 0));
       const sideVector = new THREE.Vector3((d ? 1 : 0) - (a ? 1 : 0), 0, 0);
 
-      direction.addVectors(frontVector, sideVector).normalize().multiplyScalar(speed * dt).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
+      direction.addVectors(frontVector, sideVector).normalize().multiplyScalar(speed * dt).applyEuler(new THREE.Euler(0, yawRef.current, 0));
 
       const nx = ref.current.position.x + direction.x;
       const nz = ref.current.position.z + direction.z;
@@ -668,15 +793,21 @@ function PlayerController({ userName, onZoneChange, onNearChair, onNearInteracta
     targetCamPos.y += 1.4;
     camera.position.lerp(targetCamPos, 0.3);
 
+    // Manual camera rotation
+    camera.rotation.order = "YXZ";
+    camera.rotation.y = yawRef.current;
+    camera.rotation.x = pitchRef.current;
+
     // Broadcast position (throttled)
     if (Math.random() < 0.1) {
       updatePosition(ref.current.position.x, ref.current.position.y, ref.current.position.z, lastZone.current);
     }
   });
 
+  const spawn = TEMPLATE_SPAWNS[template] || TEMPLATE_SPAWNS.office;
+
   return (
-    <group ref={ref} position={[0, 0.6, 24]}>
-      <PointerLockControls ref={controlsRef} />
+    <group ref={ref} position={spawn}>
     </group>
   );
 }
@@ -810,33 +941,33 @@ function OfficeWorldLayout() {
       {/* Pod 1 */}
       <Desk position={[-14, 0, 5]} />
       <Desk position={[-10, 0, 5]} />
-      <Chair position={[-14, 0, 4.2]} />
-      <Chair position={[-10, 0, 4.2]} />
+      <Chair position={[-14, 0, 4.2]} rotation={[0, Math.PI, 0]} />
+      <Chair position={[-10, 0, 4.2]} rotation={[0, Math.PI, 0]} />
       {/* Pod 2 */}
       <Desk position={[-2, 0, 5]} />
       <Desk position={[2, 0, 5]} />
-      <Chair position={[-2, 0, 4.2]} />
-      <Chair position={[2, 0, 4.2]} />
+      <Chair position={[-2, 0, 4.2]} rotation={[0, Math.PI, 0]} />
+      <Chair position={[2, 0, 4.2]} rotation={[0, Math.PI, 0]} />
       {/* Pod 3 */}
       <Desk position={[10, 0, 5]} />
       <Desk position={[14, 0, 5]} />
-      <Chair position={[10, 0, 4.2]} />
-      <Chair position={[14, 0, 4.2]} />
+      <Chair position={[10, 0, 4.2]} rotation={[0, Math.PI, 0]} />
+      <Chair position={[14, 0, 4.2]} rotation={[0, Math.PI, 0]} />
       {/* Pod 4 */}
       <Desk position={[-14, 0, 11]} />
       <Desk position={[-10, 0, 11]} />
-      <Chair position={[-14, 0, 10.2]} />
-      <Chair position={[-10, 0, 10.2]} />
+      <Chair position={[-14, 0, 10.2]} rotation={[0, Math.PI, 0]} />
+      <Chair position={[-10, 0, 10.2]} rotation={[0, Math.PI, 0]} />
       {/* Pod 5 */}
       <Desk position={[-2, 0, 11]} />
       <Desk position={[2, 0, 11]} />
-      <Chair position={[-2, 0, 10.2]} />
-      <Chair position={[2, 0, 10.2]} />
+      <Chair position={[-2, 0, 10.2]} rotation={[0, Math.PI, 0]} />
+      <Chair position={[2, 0, 10.2]} rotation={[0, Math.PI, 0]} />
       {/* Pod 6 */}
       <Desk position={[10, 0, 11]} />
       <Desk position={[14, 0, 11]} />
-      <Chair position={[10, 0, 10.2]} />
-      <Chair position={[14, 0, 10.2]} />
+      <Chair position={[10, 0, 10.2]} rotation={[0, Math.PI, 0]} />
+      <Chair position={[14, 0, 10.2]} rotation={[0, Math.PI, 0]} />
       {/* Standing desks + utilities */}
       <StandingDesk position={[-6, 0, 16]} />
       <StandingDesk position={[6, 0, 16]} />
@@ -847,10 +978,10 @@ function OfficeWorldLayout() {
       <GlassPartition position={[-24, 1.5, 0]} size={[8, 3, 0.1]} />
       <GlassPartition position={[-20, 1.5, -4]} size={[0.1, 3, 8]} />
       <MeetingTable position={[-24, 0, -4]} />
-      <Chair position={[-26, 0, -4]} color="#3B82F6" />
-      <Chair position={[-22, 0, -4]} color="#3B82F6" />
-      <Chair position={[-24, 0, -6]} color="#3B82F6" />
-      <Chair position={[-24, 0, -2]} color="#3B82F6" />
+      <Chair position={[-26, 0, -4]} rotation={[0, Math.PI / 2, 0]} color="#3B82F6" />
+      <Chair position={[-22, 0, -4]} rotation={[0, -Math.PI / 2, 0]} color="#3B82F6" />
+      <Chair position={[-24, 0, -6]} rotation={[0, 0, 0]} color="#3B82F6" />
+      <Chair position={[-24, 0, -2]} rotation={[0, Math.PI, 0]} color="#3B82F6" />
       <BroadcastScreen position={[-27.5, 1.5, -4]} rotation={[0, Math.PI / 2, 0]} size={[2, 1.3]} />
 
       {/* ── MEETING ROOM 2 (center, large) ────────── */}
@@ -858,18 +989,18 @@ function OfficeWorldLayout() {
       <GlassPartition position={[10, 1.5, -6]} size={[0.1, 3, 8]} />
       <GlassPartition position={[0, 1.5, -10]} size={[20, 3, 0.1]} />
       <MeetingTable position={[0, 0, -6]} size="large" />
-      {[-3, -1, 1, 3].map(x => <Chair key={`mc-n-${x}`} position={[x, 0, -8]} color="#3B82F6" />)}
-      {[-3, -1, 1, 3].map(x => <Chair key={`mc-s-${x}`} position={[x, 0, -4]} color="#3B82F6" />)}
+      {[-3, -1, 1, 3].map(x => <Chair key={`mc-n-${x}`} position={[x, 0, -8]} rotation={[0, 0, 0]} color="#3B82F6" />)}
+      {[-3, -1, 1, 3].map(x => <Chair key={`mc-s-${x}`} position={[x, 0, -4]} rotation={[0, Math.PI, 0]} color="#3B82F6" />)}
       <BroadcastScreen position={[0, 1.8, -9.5]} size={[5, 2.5]} />
 
       {/* ── MEETING ROOM 3 (east) ─────────────────── */}
       <GlassPartition position={[24, 1.5, 0]} size={[8, 3, 0.1]} />
       <GlassPartition position={[20, 1.5, -4]} size={[0.1, 3, 8]} />
       <MeetingTable position={[24, 0, -4]} />
-      <Chair position={[22, 0, -4]} color="#3B82F6" />
-      <Chair position={[26, 0, -4]} color="#3B82F6" />
-      <Chair position={[24, 0, -6]} color="#3B82F6" />
-      <Chair position={[24, 0, -2]} color="#3B82F6" />
+      <Chair position={[22, 0, -4]} rotation={[0, Math.PI / 2, 0]} color="#3B82F6" />
+      <Chair position={[26, 0, -4]} rotation={[0, -Math.PI / 2, 0]} color="#3B82F6" />
+      <Chair position={[24, 0, -6]} rotation={[0, 0, 0]} color="#3B82F6" />
+      <Chair position={[24, 0, -2]} rotation={[0, Math.PI, 0]} color="#3B82F6" />
       <BroadcastScreen position={[27.5, 1.5, -4]} rotation={[0, -Math.PI / 2, 0]} size={[2, 1.3]} />
 
       {/* ── CAFÉ / BREAK AREA ─────────────────────── */}
@@ -904,7 +1035,7 @@ function OfficeWorldLayout() {
       <BroadcastScreen position={[0, 2.5, -22]} size={[8, 4]} />
       {/* Audience seating rows */}
       {[-4, -2, 0, 2, 4].map(x => [-14, -15, -16].map(z => (
-        <Chair key={`seat-${x}-${z}`} position={[x, 0, z]} color="#444" />
+        <Chair key={`seat-${x}-${z}`} position={[x, 0, z]} rotation={[0, Math.PI, 0]} color="#444" />
       )))}
       <NeonSign position={[0, 2.8, -12.5]} text="🎤 MAIN STAGE" color={P.greenLight} />
 
@@ -927,11 +1058,11 @@ function OfficeWorldLayout() {
       <Desk position={[26, 0, -16]} />
       <Desk position={[18, 0, -20]} />
       <Desk position={[22, 0, -20]} />
-      <Chair position={[18, 0, -14.8]} color="#06b6d4" />
-      <Chair position={[22, 0, -14.8]} color="#06b6d4" />
-      <Chair position={[26, 0, -14.8]} color="#06b6d4" />
-      <Chair position={[18, 0, -18.8]} color="#06b6d4" />
-      <Chair position={[22, 0, -18.8]} color="#06b6d4" />
+      <Chair position={[18, 0, -14.8]} rotation={[0, Math.PI, 0]} color="#06b6d4" />
+      <Chair position={[22, 0, -14.8]} rotation={[0, Math.PI, 0]} color="#06b6d4" />
+      <Chair position={[26, 0, -14.8]} rotation={[0, Math.PI, 0]} color="#06b6d4" />
+      <Chair position={[18, 0, -18.8]} rotation={[0, Math.PI, 0]} color="#06b6d4" />
+      <Chair position={[22, 0, -18.8]} rotation={[0, Math.PI, 0]} color="#06b6d4" />
       <ArcadeCabinet position={[26, 0, -22]} />
       <NeonSign position={[21, 2.7, -12.5]} text="🎮 GAME ON" color="#06b6d4" />
 
@@ -1057,8 +1188,8 @@ function CafeLayout() {
           <cylinderGeometry args={[0.8, 0.8, 0.05, 16]} />
           <mesh position={[0, 0.8, 0]}><cylinderGeometry args={[0.8, 0.8, 0.05, 16]} /><meshStandardMaterial color="#D4A373" /></mesh>
           <mesh position={[0, 0.4, 0]}><cylinderGeometry args={[0.05, 0.05, 0.8, 8]} /><meshStandardMaterial color="#333" /></mesh>
-          <Chair position={[-1.2, 0, 0]} color="#E9C46A" />
-          <Chair position={[1.2, 0, 0]} color="#E9C46A" />
+          <Chair position={[-1.2, 0, 0]} rotation={[0, Math.PI / 2, 0]} color="#E9C46A" />
+          <Chair position={[1.2, 0, 0]} rotation={[0, -Math.PI / 2, 0]} color="#E9C46A" />
         </group>
       ))}
 
@@ -1138,7 +1269,7 @@ function ClassroomLayout() {
         [-12, -6, 0, 6, 12].map(x => (
           <group key={`desk-${x}-${z}`}>
             <Desk position={[x, 0, z]} />
-            <Chair position={[x, 0, z + 1.2]} />
+            <Chair position={[x, 0, z + 1.2]} rotation={[0, Math.PI, 0]} />
           </group>
         ))
       )}
@@ -1218,7 +1349,7 @@ function ConferenceLayout() {
         const startX = -((seatsPerRow - 1) * spacing) / 2;
         return Array.from({ length: seatsPerRow }, (_, i) => (
           <group key={`seat-${row}-${i}`}>
-            <Chair position={[startX + i * spacing, row * 0.15, z - 8]} color="#333" />
+            <Chair position={[startX + i * spacing, row * 0.15, z - 8]} rotation={[0, Math.PI, 0]} color="#333" />
           </group>
         ));
       })}
@@ -1336,8 +1467,8 @@ function LibraryLayout() {
       {[-8, 0, 8].map(x => (
         <group key={`rtable-${x}`}>
           <Desk position={[x, 0, -4]} />
-          <Chair position={[x - 1, 0, -3]} />
-          <Chair position={[x + 1, 0, -3]} />
+          <Chair position={[x - 1, 0, -3]} rotation={[0, Math.PI, 0]} />
+          <Chair position={[x + 1, 0, -3]} rotation={[0, Math.PI, 0]} />
           <FloorLamp position={[x + 2, 0, -4]} lightColor="#fff5e0" />
         </group>
       ))}
@@ -1346,7 +1477,7 @@ function LibraryLayout() {
       {[-12, -4, 4, 12].map(x => (
         <group key={`nook-${x}`}>
           <Desk position={[x, 0, 6]} />
-          <Chair position={[x, 0, 7.2]} />
+          <Chair position={[x, 0, 7.2]} rotation={[0, Math.PI, 0]} />
         </group>
       ))}
 
@@ -1406,7 +1537,7 @@ function GamingLayout() {
       {[-14, -10, -6, 6, 10, 14].map(x => (
         <group key={`pc-${x}`}>
           <Desk position={[x, 0, 8]} />
-          <Chair position={[x, 0, 9.2]} />
+          <Chair position={[x, 0, 9.2]} rotation={[0, Math.PI, 0]} />
           <BroadcastScreen position={[x, 1.5, 7.5]} size={[1.5, 0.9]} />
         </group>
       ))}
@@ -1545,7 +1676,7 @@ function TheaterLayout() {
         const spacing = 2.5;
         const startX = -((seats - 1) * spacing) / 2;
         return Array.from({ length: seats }, (_, i) => (
-          <Chair key={`seat-${row}-${i}`} position={[startX + i * spacing, row * 0.2, z - 6]} color="#4a1a1a" />
+          <Chair key={`seat-${row}-${i}`} position={[startX + i * spacing, row * 0.2, z - 6]} rotation={[0, Math.PI, 0]} color="#4a1a1a" />
         ));
       })}
 
@@ -1617,7 +1748,7 @@ function BlankLayout({ customObjects = [] }: { customObjects?: { type: string; x
 /* ═══════════════════════════════════════════════════════════════
    MAIN SCENE
    ═══════════════════════════════════════════════════════════════ */
-function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, template, fpsMode, customObjects }: {
+function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, template, fpsMode, onFpsModeChange, customObjects }: {
   userName: string;
   onZoneChange: (z: string) => void;
   onNearChair: (near: boolean) => void;
@@ -1625,6 +1756,7 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
   onInteract: (type: string) => void;
   template: string;
   fpsMode: boolean;
+  onFpsModeChange: (fps: boolean) => void;
   customObjects?: { type: string; x: number; z: number; rotation: number }[];
 }) {
   const players = useRealtimeStore(s => s.players);
@@ -1673,6 +1805,8 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
         onNearInteractable={onNearInteractable}
         onInteract={onInteract}
         fpsMode={fpsMode}
+        onFpsModeChange={onFpsModeChange}
+        template={template}
       />
     </>
   );
@@ -1695,10 +1829,10 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
     return () => disconnect();
   }, [roomId, userName, connect, disconnect]);
 
-  // Q key toggles between FPS mode and UI mode
+  // Tab key toggles between FPS mode and UI mode
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "q" && entered) {
+      if (e.key === "Tab" && entered) {
         e.preventDefault();
         setFpsMode(prev => !prev);
       }
@@ -1711,6 +1845,11 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
     setEntered(true);
     setFpsMode(true);
   };
+
+  // Stable callback for PlayerController to sync pointer lock state
+  const handleFpsModeChange = useCallback((fps: boolean) => {
+    setFpsMode(fps);
+  }, []);
 
   const handleInteract = (type: string) => {
     // When interacting with objects, switch to UI mode so user can use the panel
@@ -1744,6 +1883,7 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
           onInteract={handleInteract}
           template={template}
           fpsMode={fpsMode}
+          onFpsModeChange={handleFpsModeChange}
           customObjects={customObjects}
         />
       </Canvas>
@@ -1759,7 +1899,7 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10">
           <span className="text-sm">{fpsMode ? "🔒" : "🖱️"}</span>
           <span className="text-white text-xs font-medium">{fpsMode ? "Navigation Mode" : "UI Mode"}</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-white text-[10px] font-mono">Q</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-white/20 text-white text-[10px] font-mono">Tab</kbd>
         </div>
       )}
 
@@ -1786,7 +1926,7 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
 
       {/* Controls hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 text-gray-500 text-xs bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full select-none pointer-events-none">
-        Movement: WASD · Look: Mouse · Interact: E · Toggle Mode: Q
+        Movement: WASD · Look: Mouse · Interact: E · Toggle Mode: Tab
       </div>
     </div>
   );
