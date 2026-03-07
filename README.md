@@ -1,156 +1,104 @@
-# 🏠 Huddly — Walk up. Talk naturally.
-
 <div align="center">
-
-**The friendliest 2D virtual world for classrooms, offices, coworking, and events.**
-
-*No awkward meeting links ever. Just walk up and talk.*
-
+  <img src="public/header-logo.png" alt="Huddly Logo" width="300" />
+  <h1>Huddly</h1>
+  <p><strong>A fully immersive, 3D spatial virtual office and meeting environment built for the future of remote work.</strong></p>
 </div>
 
 ---
 
-## ✨ Features
+## 🌟 Overview
 
-- **Proximity Magic** — Video & spatial audio auto-activates when avatars are close
-- **Infinite Custom Maps** — 200+ drag-and-drop objects with Tiled-compatible format
-- **Classroom Mode** — Stage tile with broadcast, auto-seating for students
-- **Emotes & Status** — Wave, react, set your status (Free / Focused / In Meeting)
-- **Private Huddle Zones** — Audio only for people inside the polygon
-- **Screen Sharing + Whiteboard** — Collaborate in real-time
-- **Mobile Friendly** — Touch drag, virtual joystick, pinch zoom
-- **Dark/Light Themes** — Every theme is crafted with love
+Huddly is a next-generation virtual workspace that bridges the gap between remote and in-person collaboration. Move your avatar through a beautifully rendered 3D office, seamlessly transition into video calls when you walk up to colleagues, collaborate on shared whiteboards, and broadcast your screen to the whole room. 
 
-## 🛠️ Tech Stack
+Say goodbye to grid-view fatigue and hello to spatial, persistent, and engaging remote team spaces.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15 (App Router) + TypeScript + Tailwind CSS |
-| UI | shadcn/ui + Radix UI + Framer Motion |
-| State | Zustand + TanStack Query |
-| 2D Engine | Phaser 3.70+ (integrated as React component) |
-| Pathfinding | EasyStar.js (A* algorithm) |
-| Real-time | Supabase Realtime + Socket.io (fallback) |
-| Video/Audio | LiveKit (selective WebRTC, proximity-based) |
-| Auth | Supabase Auth (Google, Magic Link, Guest) |
-| Database | Supabase (Postgres + Storage) |
-| Deployment | Vercel (frontend) + Supabase (backend) |
+## ✨ Key Features
 
-## 📁 Project Structure
+- **🚶‍♂️ Spatial Proximity Video/Audio:** Walk near a colleague in the 3D world, and their video feed automatically fades in. Step away, and it fades out. Spatial audio ensures you only hear those close to you.
+- **🏢 Multiple 3D Environments:** Choose from beautifully crafted templates like the *Office, Café, Library, Gaming Lounge, Main Stage, Rooftop Bar, Theater*, or build your own custom room.
+- **🖥️ Screen Sharing & Broadcasting:** Walk up to TV screens in meeting rooms or the main stage to broadcast your screen to everyone in the vicinity.
+- **🎨 Shared Whiteboards:** Real-time synchronized whiteboards for collaborative brainstorming.
+- **🛠️ Room Builder:** A fully interactive 2D grid editor to drag and drop desks, chairs, plants, and screens to design your team's perfect custom virtual space.
+- **⚡ Real-time Multiplayer:** High-performance, low-latency movement and chat synchronization using Socket.IO.
 
-```
-src/
-├── app/                     # Next.js App Router pages
-│   ├── page.tsx             # Landing page
-│   ├── login/page.tsx       # Auth page
-│   ├── dashboard/page.tsx   # Room management
-│   ├── room/[id]/page.tsx   # In-room experience
-│   └── editor/[id]/page.tsx # Map editor
-├── components/
-│   ├── landing/             # Hero, Features, Pricing, etc.
-│   ├── room/                # Chat, Minimap, Toolbar, Emotes
-│   ├── ui/                  # Button, Card, Dialog, Input, Badge
-│   └── shared/              # Navbar, Footer
-├── game/
-│   ├── PhaserGame.tsx       # React ↔ Phaser wrapper
-│   └── scenes/
-│       └── RoomScene.ts     # Main game scene
-├── stores/                  # Zustand stores
-│   ├── authStore.ts
-│   ├── roomStore.ts
-│   └── spacesStore.ts
-├── types/index.ts           # TypeScript types
-└── lib/utils.ts             # Utilities
-```
+## 🚀 Tech Stack
 
-## 🚀 Getting Started
+- **Frontend:** Next.js (App Router), React 19, TypeScript, Tailwind CSS, Framer Motion
+- **3D Graphics:** Three.js, React Three Fiber (`@react-three/fiber`), React Three Drei (`@react-three/drei`)
+- **WebRTC / Media:** LiveKit (`@livekit/components-react`, `livekit-server-sdk`)
+- **Real-time Engine:** Custom Node.js + Socket.IO Server
+- **State Management:** Zustand
+- **Database:** Supabase 
+
+## 📸 Sneak Peek
+
+*(Add screenshots of your 3D world, video call proximity, and room builder here!)*
+
+## 🛠️ Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- npm or yarn
+- [Node.js](https://nodejs.org/) (v18 or higher)
+- A [LiveKit](https://livekit.io/) Cloud account (for WebRTC video/audio)
+- A [Supabase](https://supabase.com/) account (for storing rooms & spaces)
 
-### Installation
-
+### 1. Clone the repository
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/huddly.git
+git clone https://github.com/harshal0704/huddly.git
 cd huddly
+```
 
-# Install dependencies
+### 2. Install dependencies
+```bash
 npm install
+```
 
-# Copy environment variables
-cp .env.example .env.local
-# Edit .env.local with your Supabase and LiveKit credentials
+### 3. Environment Variables
+Create a `.env.local` file in the root directory and populate it with your environment variables:
 
-# Start development server
+```env
+# URL for the app
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# LiveKit Keys
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
+NEXT_PUBLIC_LIVEKIT_URL=wss://your-project-id.livekit.cloud
+
+# Socket Server
+NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+SOCKET_PORT=3001
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 4. Start the Application
+
+You'll need to run both the Next.js frontend and the Socket.IO server simultaneously.
+
+**Terminal 1 (Start Socket Server):**
+```bash
+npm run server
+```
+
+**Terminal 2 (Start Next.js Client):**
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+The app will be available at `http://localhost:3000`.
 
-### Environment Variables
+## 🎮 How to Play
 
-See `.env.example` for all required variables:
-
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
-| `NEXT_PUBLIC_LIVEKIT_URL` | LiveKit server WebSocket URL |
-| `NEXTAUTH_SECRET` | Random secret for NextAuth |
-| `NEXTAUTH_URL` | Your app's URL |
-
-### Building for Production
-
-```bash
-npm run build
-npm start
-```
-
-### Deploy to Vercel
-
-```bash
-npx vercel
-```
-
-The included `vercel.json` configures security headers automatically.
-
-## 🎮 Controls
-
-| Key | Action |
-|-----|--------|
-| `W/A/S/D` or Arrow Keys | Move avatar |
-| Mouse Click | Walk to point (A* pathfinding) |
-| `Spacebar` | Quick emote |
-| Bottom toolbar | Mute, Camera, Chat, Participants, Minimap |
-
-## 🎨 Asset Manifest
-
-The following sprite assets are needed for full visual fidelity:
-
-| Asset | Description | Size |
-|-------|-------------|------|
-| `avatar_spritesheet.png` | 8-direction walking sprites, 64x64 per frame | 512×512 |
-| `tileset_floors.png` | Floor tiles (wood, carpet, grass, stone) | 256×256 |
-| `tileset_walls.png` | Wall tiles (various styles) | 256×128 |
-| `objects_furniture.png` | Desks, chairs, sofas, tables | 512×512 |
-| `objects_tech.png` | Whiteboards, TVs, computers | 256×256 |
-| `objects_decor.png` | Plants, lamps, paintings, rugs | 256×256 |
-| `objects_interactive.png` | Doors, coffee machines, arcade | 256×256 |
-| `emotes_spritesheet.png` | Animated emoji reactions | 128×128 |
-| `ui_icons.png` | Status icons, badges | 64×64 |
-
-> 💡 All assets can be generated with AI image generation tools — the game currently uses procedural graphics and emoji as placeholders.
-
-## 📝 License
-
-MIT
+- **Movement:** `W`, `A`, `S`, `D` to walk around the room.
+- **Look:** Use your mouse to look around in First-Person mode.
+- **Toggle Mode:** Press `Tab` to toggle between **UI Mode** (to click buttons and panels) and **Navigation Mode** (to look and walk).
+- **Interact:** Press `E` when close to interactable objects:
+  - 🪑 Chairs: Sit down / Stand up
+  - 🖥️ TV Screens: Start screen sharing to the room
+  - ✏️ Whiteboards: Open the shared drawing board
 
 ---
 
-<div align="center">
-
-**Made with ❤️ by Harshal**
-
-</div>
+*Built with ❤️ for a better remote work experience.*
