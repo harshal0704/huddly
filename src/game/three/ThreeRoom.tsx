@@ -403,6 +403,7 @@ function Avatar({ color, name, cameraTrack, audioTrack }: { color: string; name:
   const videoRef = useRef<HTMLDivElement>(null);
   const audioHtmlRef = useRef<HTMLAudioElement>(null);
   const { camera } = useThree();
+  const [isNear, setIsNear] = useState(false);
 
   useEffect(() => {
     if (audioHtmlRef.current && audioTrack?.publication?.track) {
@@ -420,10 +421,13 @@ function Avatar({ color, name, cameraTrack, audioTrack }: { color: string; name:
       const worldPos = new THREE.Vector3();
       ref.current.getWorldPosition(worldPos);
       const dist = camera.position.distanceTo(worldPos);
+      const near = dist < 8;
+
+      if (near !== isNear) setIsNear(near);
 
       // Video fading
       if (videoRef.current) {
-        if (dist < 8) {
+        if (near) {
           videoRef.current.style.opacity = "1";
           videoRef.current.style.transform = "scale(1)";
         } else {
