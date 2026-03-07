@@ -67,6 +67,9 @@ export default function BroadcastPanel({
     const handleGoLive = async () => {
         try {
             setErrorMsg("");
+            if (!isScreenSharing) {
+                await localParticipant.setScreenShareEnabled(true);
+            }
             if (isCameraOff) {
                 await localParticipant.setCameraEnabled(true);
             }
@@ -76,7 +79,7 @@ export default function BroadcastPanel({
             setIsLive(true);
         } catch (e: any) {
             console.error("Failed to go live:", e);
-            setErrorMsg(e.message || "Failed to access camera/microphone.");
+            setErrorMsg(e.message || "Failed to start screen share.");
         }
     };
 

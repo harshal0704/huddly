@@ -14,28 +14,28 @@ interface MeetingRoomHUDProps {
 
 export default function MeetingRoomHUD({ isInMeetingZone, zoneName, onLeave }: MeetingRoomHUDProps) {
     const [joined, setJoined] = useState(false);
-    const [muted, setMuted] = useState(false);
-    const [cameraOff, setCameraOff] = useState(false);
-    const [sharing, setSharing] = useState(false);
+    const [audioEnabled, setAudioEnabled] = useState(false);
+    const [videoEnabled, setVideoEnabled] = useState(false);
+    const [screenEnabled, setScreenEnabled] = useState(false);
 
     const room = useRoomContext();
 
     // Auto-connect video/audio when entering zone
     useEffect(() => {
         if (isInMeetingZone) {
-            const timer = setTimeout(async () => {
+            const timer = setTimeout(() => {
                 setJoined(true);
             }, 1500);
             return () => clearTimeout(timer);
         } else {
             setJoined(false);
-            setSharing(false);
+            setScreenEnabled(false);
+            setVideoEnabled(false);
+            setAudioEnabled(false);
             // Disable tracks when leaving
             room.localParticipant.setMicrophoneEnabled(false);
             room.localParticipant.setCameraEnabled(false);
             room.localParticipant.setScreenShareEnabled(false);
-            setMuted(false);
-            setCameraOff(false);
         }
     }, [isInMeetingZone, room]);
 
@@ -44,28 +44,29 @@ export default function MeetingRoomHUD({ isInMeetingZone, zoneName, onLeave }: M
         room.localParticipant.setMicrophoneEnabled(false);
         room.localParticipant.setCameraEnabled(false);
         room.localParticipant.setScreenShareEnabled(false);
-        setMuted(false);
-        setCameraOff(false);
+        setAudioEnabled(false);
+        setVideoEnabled(false);
+        setScreenEnabled(false);
         onLeave?.();
     }, [onLeave, room]);
 
     const handleToggleMic = useCallback(async () => {
-        if (muted) await room.localParticipant.setMicrophoneEnabled(true);
-        else await room.localParticipant.setMicrophoneEnabled(false);
-        setMuted(!muted);
-    }, [muted, room]);
+        const nextState = !audioEnabled;
+        await room.localParticipant.setMicrophoneEnabled(nextState);
+        setAudioEnabled(nextState);
+    }, [audioEnabled, room]);
 
     const handleToggleCamera = useCallback(async () => {
-        if (cameraOff) await room.localParticipant.setCameraEnabled(true);
-        else await room.localParticipant.setCameraEnabled(false);
-        setCameraOff(!cameraOff);
-    }, [cameraOff, room]);
+        const nextState = !videoEnabled;
+        await room.localParticipant.setCameraEnabled(nextState);
+        setVideoEnabled(nextState);
+    }, [videoEnabled, room]);
 
     const handleToggleShare = useCallback(async () => {
-        if (sharing) await room.localParticipant.setScreenShareEnabled(false);
-        else await room.localParticipant.setScreenShareEnabled(true);
-        setSharing(!sharing);
-    }, [sharing, room]);
+        const nextState = !screenEnabled;
+        await room.localParticipant.setScreenShareEnabled(nextState);
+        setScreenEnabled(nextState);
+    }, [screenEnabled, room]);
 
     // Fetch all video tracks (local + remote)
     const tracks = useTracks(
@@ -140,7 +141,7 @@ export default function MeetingRoomHUD({ isInMeetingZone, zoneName, onLeave }: M
                                 </div>
                             ) : (
                                 tracks.slice(0, 4).map((track, i) => (
-                                    <div key={track.participant.identity + track.source} className={`relative rounded-xl overflow-hidden bg-slate-900 ring-1 ring-slate-200/50 shadow-sm ${i === 0 && tracks.length < 3 ? "col-span-2 h-32" : "h-24"} [&>.lk-participant-tile]:w-full [&>.lk-participant-tile]:h-full [&>div>video]:object-cover`}>
+                                    <div key={track.participant.identity + track.source} className={`relative rounded-xl overflow-hidden bg-slate-900 ring-1 ring-slate-200/50 shadow-sm ${i === 0 && tracks.length < 3 ? "col-span-2 h-32" : "h-24"} [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover`}>
                                         <ParticipantTile trackRef={track} />
                                     </div>
                                 ))
@@ -148,7 +149,7 @@ export default function MeetingRoomHUD({ isInMeetingZone, zoneName, onLeave }: M
                         </div>
 
                         {/* Screen share indicator */}
-                        {sharing && (
+                        {screenEnabled && (
                             <div className="mx-3 mt-3 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100 text-[#007AFF] text-xs font-semibold flex items-center gap-2">
                                 <Monitor className="w-4 h-4" />
                                 You are sharing your screen
@@ -159,21 +160,21 @@ export default function MeetingRoomHUD({ isInMeetingZone, zoneName, onLeave }: M
                         <div className="flex items-center justify-center gap-3 px-4 py-4">
                             <button
                                 onClick={handleToggleMic}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border shadow-sm ${muted ? "bg-red-50 text-red-600 border-red-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
+                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border shadow-sm ${!audioEnabled ? "bg-red-50 text-red-600 border-red-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
                                     }`}
                             >
-                                {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                                {!audioEnabled ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                             </button>
                             <button
                                 onClick={handleToggleCamera}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border shadow-sm ${cameraOff ? "bg-red-50 text-red-600 border-red-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
+                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border shadow-sm ${!videoEnabled ? "bg-red-50 text-red-600 border-red-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
                                     }`}
                             >
-                                {cameraOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                                {!videoEnabled ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                             </button>
                             <button
                                 onClick={handleToggleShare}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border shadow-sm ${sharing ? "bg-blue-50 text-[#007AFF] border-blue-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
+                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border shadow-sm ${screenEnabled ? "bg-blue-50 text-[#007AFF] border-blue-100" : "bg-white text-slate-600 border-slate-200 hover:text-[#007AFF] hover:border-[#007AFF]/30"
                                     }`}
                             >
                                 <Monitor className="w-4 h-4" />
