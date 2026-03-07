@@ -153,6 +153,25 @@ export default function DashboardPage() {
                                     <label className="text-sm text-gray-600 mb-1.5 block">Description</label>
                                     <Input placeholder="What's this space for?" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
                                 </div>
+                                <div>
+                                    <label className="text-sm text-gray-600 mb-1.5 block">Template</label>
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={newTemplate}
+                                        onChange={(e) => setNewTemplate(e.target.value as RoomTemplate)}
+                                    >
+                                        <option value="office">Office</option>
+                                        <option value="classroom">Classroom</option>
+                                        <option value="cafe">Cafe</option>
+                                        <option value="conference">Conference</option>
+                                        <option value="party">Party</option>
+                                        <option value="library">Library</option>
+                                        <option value="gaming">Gaming</option>
+                                        <option value="rooftop">Rooftop</option>
+                                        <option value="theater">Theater</option>
+                                        <option value="blank">Blank</option>
+                                    </select>
+                                </div>
                                 <div className="flex gap-4">
                                     <div className="flex-1">
                                         <label className="text-sm text-gray-600 mb-1.5 block">Visibility</label>

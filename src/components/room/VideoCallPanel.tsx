@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Video, VideoOff, Mic, MicOff, Pin, X, PhoneOff, Phone, Monitor } from "lucide-react";
-import { useRoomContext, useTracks, ParticipantTile } from "@livekit/components-react";
+import { useRoomContext, useLocalParticipant, useTracks, ParticipantTile } from "@livekit/components-react";
 import { Track } from "livekit-client";
 
 interface VideoCallPanelProps {
@@ -17,6 +17,7 @@ export default function VideoCallPanel({
     onClose,
 }: VideoCallPanelProps) {
     const room = useRoomContext();
+    const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
     const [pinnedId, setPinnedId] = useState<string | null>(null);
 
     // Fetch all video tracks (local + remote) and ScreenShares
@@ -31,8 +32,8 @@ export default function VideoCallPanel({
     const pinnedTrack = pinnedId ? tracks.find((t) => t.participant.identity === pinnedId) : null;
     const gridTracks = pinnedId ? tracks.filter((t) => t.participant.identity !== pinnedId) : tracks;
 
-    // Check if we are connected
-    const isConnected = room.state === 'connected';
+    // Check if we are participating with media
+    const isParticipating = isCameraEnabled || isMicrophoneEnabled || localParticipant.isScreenShareEnabled;
 
     const handleJoinClick = async () => {
         // Optional logic: we could rely on auto-connect, or force tracks on.
@@ -65,7 +66,7 @@ export default function VideoCallPanel({
                     </div>
 
                     {/* Join call prompt if no camera enabled globally */}
-                    {!isConnected && (
+                    {!isParticipating && (
                         <div className="px-4 py-6 text-center">
                             <div className="w-12 h-12 rounded-full bg-violet-500/20 flex items-center justify-center mx-auto mb-3">
                                 <Video className="w-6 h-6 text-violet-400" />
@@ -85,7 +86,7 @@ export default function VideoCallPanel({
                     {/* Pinned video */}
                     {pinnedTrack && (
                         <div className="px-3 pt-3">
-                            <div className="relative rounded-xl overflow-hidden aspect-video ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/20 [&>.lk-participant-tile]:w-full [&>.lk-participant-tile]:h-full [&>div>video]:object-cover cursor-pointer" onClick={() => setPinnedId(null)}>
+                            <div className="relative rounded-xl overflow-hidden aspect-video ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/20 [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover cursor-pointer" onClick={() => setPinnedId(null)}>
                                 <ParticipantTile trackRef={pinnedTrack} />
                             </div>
                         </div>
@@ -95,7 +96,7 @@ export default function VideoCallPanel({
                     <div className={`p-3 grid gap-2 overflow-y-auto ${pinnedId ? "grid-cols-4" : "grid-cols-2"}`}>
                         {gridTracks.map((t) => (
                             <div key={t.participant.identity + t.source}
-                                className={`relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ring-1 ring-white/10 aspect-square [&>.lk-participant-tile]:w-full [&>.lk-participant-tile]:h-full [&>div>video]:object-cover`}
+                                className={`relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ring-1 ring-white/10 aspect-square [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover`}
                                 onClick={() => setPinnedId(t.participant.identity)}
                             >
                                 <ParticipantTile trackRef={t} />

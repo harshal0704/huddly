@@ -71,6 +71,7 @@ const io = new Server(server, {
     },
     pingInterval: 10000,  // Send ping every 10s
     pingTimeout: 5000,    // Disconnect if no pong within 5s
+    maxHttpBufferSize: 1e8, // 100 MB for Whiteboard base64 Sync
 });
 
 // ── In-memory state ─────────────────────────────────────────

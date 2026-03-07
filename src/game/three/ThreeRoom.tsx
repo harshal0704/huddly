@@ -295,17 +295,24 @@ function MeetingTable({ position, size = "small" }: { position: [number, number,
 
 function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, number], size = [3, 1.8] }: { position: [number, number, number]; rotation?: [number, number, number]; size?: [number, number] }) {
   const ref = useRef<THREE.Mesh>(null);
+  const { camera } = useThree();
+  const [isNear, setIsNear] = useState(false);
 
   const tracks = useTracks([
-    { source: Track.Source.ScreenShare, withPlaceholder: false },
-    { source: Track.Source.Camera, withPlaceholder: false }
-  ], { onlySubscribed: false });
+    { source: Track.Source.ScreenShare, withPlaceholder: false }
+  ], { onlySubscribed: true });
 
-  const activeTrack = tracks.find(t => t.source === Track.Source.ScreenShare) || tracks[0];
+  const activeTrack = tracks.find(t => t.source === Track.Source.ScreenShare);
 
   useFrame((s) => {
-    if (ref.current && !activeTrack) {
-      (ref.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + Math.sin(s.clock.elapsedTime * 0.5) * 0.1;
+    if (ref.current) {
+      const dist = camera.position.distanceTo(ref.current.position);
+      const near = dist < 12; // Adjust distance as needed
+      if (near !== isNear) setIsNear(near);
+
+      if (!activeTrack || !near) {
+        (ref.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + Math.sin(s.clock.elapsedTime * 0.5) * 0.1;
+      }
     }
   });
 
@@ -316,15 +323,15 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
       </RoundedBox>
       <mesh ref={ref} position={[0, 0, 0.05]}>
         <planeGeometry args={size} />
-        {activeTrack ? (
+        {activeTrack && isNear ? (
           <meshBasicMaterial color="#000" />
         ) : (
           <meshStandardMaterial color="#0a1a10" emissive={P.green} emissiveIntensity={0.3} roughness={0.1} metalness={0.9} />
         )}
       </mesh>
-      {activeTrack && (
+      {activeTrack && isNear && (
         <Html position={[0, 0, 0.06]} transform distanceFactor={1.5} center zIndexRange={[100, 0]} style={{ width: `${size[0] * 200}px`, height: `${size[1] * 200}px` }}>
-          <div className="w-full h-full overflow-hidden [&>.lk-participant-tile]:w-full [&>.lk-participant-tile]:h-full [&>div>video]:object-cover" style={{ pointerEvents: 'none' }}>
+          <div className="w-full h-full overflow-hidden [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover" style={{ pointerEvents: 'none' }}>
             <ParticipantTile trackRef={activeTrack} />
           </div>
         </Html>
@@ -505,12 +512,14 @@ function Avatar({ color, name, cameraTrack, audioTrack }: { color: string; name:
         <Html position={[0, 1.8, 0]} transform distanceFactor={2.5} center zIndexRange={[100, 0]}>
           <div
             ref={videoRef}
-            className="w-24 h-24 rounded-full overflow-hidden border-4 bg-gray-900 transition-all duration-300 shadow-xl"
+            className={`w-24 h-24 rounded-full overflow-hidden border-4 bg-gray-900 transition-all duration-300 shadow-xl ${!isNear ? 'pointer-events-none' : ''}`}
             style={{ borderColor: color, opacity: 0, transform: "scale(0.5)" }}
           >
-            <div className="w-full h-full [&>.lk-participant-tile]:w-full [&>.lk-participant-tile]:h-full [&>div>video]:object-cover" style={{ pointerEvents: 'none' }}>
-              <ParticipantTile trackRef={cameraTrack} />
-            </div>
+            {isNear && (
+              <div className="w-full h-full [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover" style={{ pointerEvents: 'none' }}>
+                <ParticipantTile trackRef={cameraTrack} />
+              </div>
+            )}
           </div>
         </Html>
       )}
@@ -553,11 +562,11 @@ const CHAIR_POSITIONS: [number, number][] = [
    ═══════════════════════════════════════════════════════════════ */
 const INTERACTABLES: { type: string; position: [number, number, number]; radius: number; prompt: string }[] = [
   // Big Stage TV
-  { type: "broadcast", position: [0, 2.5, -22], radius: 5, prompt: "Stream to Screen" },
+  { type: "broadcast", position: [0, 2.5, -22], radius: 5, prompt: "Share Screen" },
   // Meeting Room TVs
-  { type: "broadcast", position: [-27.5, 1.5, -4], radius: 3, prompt: "Present" },
-  { type: "broadcast", position: [0, 1.8, -9.5], radius: 4, prompt: "Present" },
-  { type: "broadcast", position: [27.5, 1.5, -4], radius: 3, prompt: "Present" },
+  { type: "broadcast", position: [-27.5, 1.5, -4], radius: 3, prompt: "Share Screen" },
+  { type: "broadcast", position: [0, 1.8, -9.5], radius: 4, prompt: "Share Screen" },
+  { type: "broadcast", position: [27.5, 1.5, -4], radius: 3, prompt: "Share Screen" },
   // ScrumBoard
   { type: "whiteboard", position: [19, 0, 6], radius: 3, prompt: "Edit Board" },
   // Whiteboards
@@ -1740,7 +1749,7 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
   const tracks = useTracks([
     { source: Track.Source.Camera, withPlaceholder: false },
     { source: Track.Source.Microphone, withPlaceholder: false }
-  ], { onlySubscribed: false });
+  ], { onlySubscribed: true });
 
   return (
     <>
