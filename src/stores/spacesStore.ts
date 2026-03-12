@@ -1,213 +1,139 @@
 // ============================================
-// Huddly — Spaces Store (Zustand)
+// Huddly — Spaces Store (Zustand) — API-backed
 // ============================================
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import type { Room, RoomTemplate, MapData } from "@/types";
-import { generateRoomId } from "@/lib/utils";
-
-// Default empty map
-const createDefaultMap = (): MapData => ({
-    width: 40,
-    height: 30,
-    tileWidth: 32,
-    tileHeight: 32,
-    layers: [
-        { id: "floor", name: "Floor", type: "tile", visible: true, data: new Array(40 * 30).fill(1) },
-        { id: "walls", name: "Walls", type: "tile", visible: true, data: new Array(40 * 30).fill(0) },
-        { id: "objects", name: "Objects", type: "object", visible: true, objects: [] },
-    ],
-    objects: [],
-    tilesets: [],
-});
+import type { Room, RoomTemplate } from "@/types";
 
 interface SpacesState {
     rooms: Room[];
-    addRoom: (name: string, description: string, template: RoomTemplate, visibility: Room["visibility"], maxCapacity: number) => Room;
-    deleteRoom: (id: string) => void;
-    duplicateRoom: (id: string) => Room | null;
+    isLoading: boolean;
+    error: string | null;
+
+    fetchRooms: () => Promise<void>;
+    addRoom: (name: string, description: string, template: RoomTemplate, visibility: Room["visibility"], maxCapacity: number, password?: string) => Promise<Room>;
+    deleteRoom: (id: string) => Promise<void>;
+    duplicateRoom: (id: string) => Promise<Room | null>;
     updateRoom: (id: string, updates: Partial<Room>) => void;
 }
 
-export const useSpacesStore = create<SpacesState>()(
-    persist(
-        (set, get) => ({
-            rooms: [
-                {
-                    id: "office",
-                    name: "Team HQ 🏢",
-                    description: "Our virtual office with team pods and a break area",
-                    ownerId: "system",
-                    template: "office",
-                    visibility: "public",
-                    maxCapacity: 50,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-01"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "demo",
-                    name: "Demo Classroom 📚",
-                    description: "A cozy classroom for learning together",
-                    ownerId: "system",
-                    template: "classroom",
-                    visibility: "public",
-                    maxCapacity: 25,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-01-15"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "cafe",
-                    name: "Pixel Café ☕",
-                    description: "Grab a virtual coffee and chat with friends",
-                    ownerId: "system",
-                    template: "cafe",
-                    visibility: "public",
-                    maxCapacity: 15,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-10"),
-                    updatedAt: new Date("2026-02-18"),
-                },
-                {
-                    id: "conference",
-                    name: "Tech Talk Hall 🎤",
-                    description: "Conference hall for presentations and AMAs",
-                    ownerId: "system",
-                    template: "conference",
-                    visibility: "public",
-                    maxCapacity: 100,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-05"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "party",
-                    name: "Friday Vibes 🎉",
-                    description: "Weekend Party Island with DJ booth and dance floor",
-                    ownerId: "system",
-                    template: "party",
-                    visibility: "public",
-                    maxCapacity: 30,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-14"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "library",
-                    name: "Quiet Library 📖",
-                    description: "Focus zone with bookshelves and reading nooks",
-                    ownerId: "system",
-                    template: "library",
-                    visibility: "public",
-                    maxCapacity: 20,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-15"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "gaming",
-                    name: "Gaming Lounge 🎮",
-                    description: "Arcade cabinets, ping pong, and neon vibes",
-                    ownerId: "system",
-                    template: "gaming",
-                    visibility: "public",
-                    maxCapacity: 20,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-16"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "rooftop",
-                    name: "Rooftop Bar 🌃",
-                    description: "City skyline views with lounge seating",
-                    ownerId: "system",
-                    template: "rooftop",
-                    visibility: "public",
-                    maxCapacity: 25,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-17"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "theater",
-                    name: "Theater 🎭",
-                    description: "Watch party with stage and tiered seating",
-                    ownerId: "system",
-                    template: "theater",
-                    visibility: "public",
-                    maxCapacity: 50,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-18"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-                {
-                    id: "blank",
-                    name: "Blank Canvas 🎨",
-                    description: "Empty room — build your own with Room Builder",
-                    ownerId: "system",
-                    template: "blank",
-                    visibility: "public",
-                    maxCapacity: 20,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date("2026-02-19"),
-                    updatedAt: new Date("2026-02-20"),
-                },
-            ],
+// Fallback rooms for offline/error scenarios
+const FALLBACK_ROOMS: Room[] = [
+    { id: "office", name: "Team HQ 🏢", description: "Our virtual office with team pods and a break area", ownerId: "system", template: "office", visibility: "public", maxCapacity: 50, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-01"), updatedAt: new Date("2026-02-20") },
+    { id: "demo", name: "Demo Classroom 📚", description: "A cozy classroom for learning together", ownerId: "system", template: "classroom", visibility: "public", maxCapacity: 25, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-01-15"), updatedAt: new Date("2026-02-20") },
+    { id: "cafe", name: "Pixel Café ☕", description: "Grab a virtual coffee and chat with friends", ownerId: "system", template: "cafe", visibility: "public", maxCapacity: 15, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-10"), updatedAt: new Date("2026-02-18") },
+    { id: "conference", name: "Tech Talk Hall 🎤", description: "Conference hall for presentations and AMAs", ownerId: "system", template: "conference", visibility: "public", maxCapacity: 100, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-05"), updatedAt: new Date("2026-02-20") },
+    { id: "party", name: "Friday Vibes 🎉", description: "Weekend Party Island", ownerId: "system", template: "party", visibility: "public", maxCapacity: 30, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-14"), updatedAt: new Date("2026-02-20") },
+    { id: "library", name: "Quiet Library 📖", description: "Focus zone with bookshelves", ownerId: "system", template: "library", visibility: "public", maxCapacity: 20, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-15"), updatedAt: new Date("2026-02-20") },
+    { id: "gaming", name: "Gaming Lounge 🎮", description: "Arcade cabinets and neon vibes", ownerId: "system", template: "gaming", visibility: "public", maxCapacity: 20, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-16"), updatedAt: new Date("2026-02-20") },
+    { id: "rooftop", name: "Rooftop Bar 🌃", description: "City skyline views", ownerId: "system", template: "rooftop", visibility: "public", maxCapacity: 25, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-17"), updatedAt: new Date("2026-02-20") },
+    { id: "theater", name: "Theater 🎭", description: "Watch party with stage", ownerId: "system", template: "theater", visibility: "public", maxCapacity: 50, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-18"), updatedAt: new Date("2026-02-20") },
+    { id: "blank", name: "Blank Canvas 🎨", description: "Build your own with Room Builder", ownerId: "system", template: "blank", visibility: "public", maxCapacity: 20, mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] }, onlineCount: 0, createdAt: new Date("2026-02-19"), updatedAt: new Date("2026-02-20") },
+];
 
-            addRoom: (name, description, template, visibility, maxCapacity) => {
-                const room: Room = {
-                    id: generateRoomId(),
+function mapApiRoom(r: any): Room {
+    return {
+        id: r.id,
+        name: r.name,
+        description: r.description || "",
+        ownerId: r.owner_id || "system",
+        template: r.template || "office",
+        visibility: r.visibility || "public",
+        maxCapacity: r.max_capacity || 20,
+        mapData: r.map_data || { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] },
+        customObjects: r.custom_objects,
+        onlineCount: r.online_count || 0,
+        createdAt: new Date(r.created_at),
+        updatedAt: new Date(r.updated_at || r.created_at),
+    };
+}
+
+export const useSpacesStore = create<SpacesState>((set, get) => ({
+    rooms: FALLBACK_ROOMS,
+    isLoading: false,
+    error: null,
+
+    fetchRooms: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const res = await fetch("/api/rooms?limit=50");
+            if (!res.ok) throw new Error("Failed to fetch rooms");
+            const data = await res.json();
+            const rooms = (data.rooms || []).map(mapApiRoom);
+            set({ rooms: rooms.length > 0 ? rooms : FALLBACK_ROOMS, isLoading: false });
+        } catch {
+            set({ rooms: FALLBACK_ROOMS, isLoading: false });
+        }
+    },
+
+    addRoom: async (name, description, template, visibility, maxCapacity, password) => {
+        try {
+            const res = await fetch("/api/rooms", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
                     name,
                     description,
-                    ownerId: "local-user",
                     template,
                     visibility,
-                    maxCapacity,
-                    mapData: createDefaultMap(),
-                    onlineCount: 0,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                };
-                set((state) => ({ rooms: [...state.rooms, room] }));
-                return room;
-            },
+                    max_capacity: maxCapacity,
+                    password,
+                }),
+            });
 
-            deleteRoom: (id) =>
-                set((state) => ({ rooms: state.rooms.filter((r) => r.id !== id) })),
+            if (!res.ok) throw new Error("Failed to create room");
+            const data = await res.json();
+            const room = mapApiRoom(data);
+            set((state) => ({ rooms: [room, ...state.rooms] }));
+            return room;
+        } catch {
+            // Fallback: create locally
+            const room: Room = {
+                id: `room_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+                name,
+                description,
+                ownerId: "local-user",
+                template,
+                visibility,
+                maxCapacity,
+                mapData: { width: 40, height: 30, tileWidth: 32, tileHeight: 32, layers: [], objects: [], tilesets: [] },
+                onlineCount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
+            set((state) => ({ rooms: [room, ...state.rooms] }));
+            return room;
+        }
+    },
 
-            duplicateRoom: (id) => {
-                const original = get().rooms.find((r) => r.id === id);
-                if (!original) return null;
-                const room: Room = {
-                    ...original,
-                    id: generateRoomId(),
-                    name: `${original.name} (Copy)`,
-                    onlineCount: 0,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                };
-                set((state) => ({ rooms: [...state.rooms, room] }));
-                return room;
-            },
+    deleteRoom: async (id) => {
+        const prevRooms = get().rooms;
+        // Optimistic delete
+        set((state) => ({ rooms: state.rooms.filter((r) => r.id !== id) }));
+        try {
+            const res = await fetch(`/api/rooms/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error();
+        } catch {
+            // Revert on failure
+            set({ rooms: prevRooms });
+        }
+    },
 
-            updateRoom: (id, updates) =>
-                set((state) => ({
-                    rooms: state.rooms.map((r) =>
-                        r.id === id ? { ...r, ...updates, updatedAt: new Date() } : r
-                    ),
-                })),
-        }),
-        { name: "huddly-spaces" }
-    )
-);
+    duplicateRoom: async (id) => {
+        const original = get().rooms.find((r) => r.id === id);
+        if (!original) return null;
+        return get().addRoom(
+            `${original.name} (Copy)`,
+            original.description,
+            original.template,
+            original.visibility,
+            original.maxCapacity
+        );
+    },
+
+    updateRoom: (id, updates) =>
+        set((state) => ({
+            rooms: state.rooms.map((r) =>
+                r.id === id ? { ...r, ...updates, updatedAt: new Date() } : r
+            ),
+        })),
+}));

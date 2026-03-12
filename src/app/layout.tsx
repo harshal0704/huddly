@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import PingServer from "@/components/shared/PingServer";
+import ToastProvider from "@/components/shared/ToastProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -78,6 +79,7 @@ export default function RootLayout({
         </head>
         <body className={`${inter.variable} antialiased`}>
           <PingServer />
+          <ToastProvider />
           {children}
         </body>
       </html>

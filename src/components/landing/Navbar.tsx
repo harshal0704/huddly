@@ -17,6 +17,7 @@ const NAV_LINKS = [
 export default function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [activeLink, setActiveLink] = useState("");
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 20);
@@ -52,9 +53,18 @@ export default function Navbar() {
                             <a
                                 key={link.name}
                                 href={link.href}
-                                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 rounded-lg hover:bg-black/5 transition-all duration-200"
+                                className="relative px-4 py-2 text-sm text-gray-600 hover:text-gray-900 rounded-lg hover:bg-black/5 transition-all duration-200"
+                                onMouseEnter={() => setActiveLink(link.name)}
+                                onMouseLeave={() => setActiveLink("")}
                             >
                                 {link.name}
+                                {activeLink === link.name && (
+                                    <motion.div
+                                        layoutId="navUnderline"
+                                        className="absolute bottom-0 left-2 right-2 h-0.5 bg-emerald-500 rounded-full"
+                                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                    />
+                                )}
                             </a>
                         ))}
                     </div>

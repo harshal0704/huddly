@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
@@ -18,8 +18,14 @@ const HeroScene = dynamic(() => import("@/components/landing/HeroScene"), {
 });
 
 export default function Hero() {
+    const sectionRef = useRef<HTMLDivElement>(null);
+    const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] });
+    const previewY = useTransform(scrollYProgress, [0, 1], [0, -80]);
+    const previewScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
+    const bgGlowOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+
     return (
-        <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 pb-8">
+        <section ref={sectionRef} className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 pb-8">
             {/* Warm gradient background */}
             <div className="absolute inset-0 -z-10">
                 <div className="absolute inset-0 bg-gradient-to-b from-emerald-50/50 via-white to-amber-50/30" />
@@ -113,6 +119,7 @@ export default function Hero() {
                     initial={{ opacity: 0, y: 40, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ delay: 0.9, type: "spring", damping: 15 }}
+                    style={{ y: previewY, scale: previewScale }}
                     className="relative max-w-4xl mx-auto"
                 >
                     <div className="relative rounded-2xl overflow-hidden border border-black/10 shadow-2xl shadow-black/10">

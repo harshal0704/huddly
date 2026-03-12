@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 const Badge = React.forwardRef<
     HTMLSpanElement,
     React.HTMLAttributes<HTMLSpanElement> & {
-        variant?: "default" | "success" | "warning" | "danger" | "info";
+        variant?: "default" | "success" | "warning" | "danger" | "info" | "secondary";
     }
 >(({ className, variant = "default", ...props }, ref) => {
     const variants: Record<string, string> = {
@@ -13,6 +13,7 @@ const Badge = React.forwardRef<
         warning: "bg-amber-500/20 text-amber-300 border-amber-500/30",
         danger: "bg-red-500/20 text-red-300 border-red-500/30",
         info: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+        secondary: "bg-gray-100 text-gray-600 border-gray-200",
     };
 
     return (
