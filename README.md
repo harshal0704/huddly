@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/header-logo.png" alt="Huddly Logo" width="300" />
+  <img src="public/logo_app.png" alt="Huddly Logo" width="300" />
   <h1>Huddly</h1>
   <p><strong>A fully immersive, 3D spatial virtual office and meeting environment built for the future of remote work.</strong></p>
 </div>
