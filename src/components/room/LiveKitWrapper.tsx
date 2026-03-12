@@ -122,7 +122,6 @@ export default function LiveKitWrapper({ roomId, userName, children }: LiveKitWr
                         Retry Connection
                     </motion.button>
                 </motion.div>
-                {children}
             </div>
         );
     }

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
 
 const NAV_LINKS = [
     { name: "Features", href: "#features" },
@@ -18,6 +18,7 @@ export default function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [activeLink, setActiveLink] = useState("");
+    const { isSignedIn } = useUser();
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 20);
@@ -76,26 +77,29 @@ export default function Navbar() {
                                 Try Demo
                             </Button>
                         </Link>
-                        <Show when="signed-in">
-                            <Link href="/dashboard">
-                                <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100">
-                                    Dashboard
-                                </Button>
-                            </Link>
-                            <UserButton signInUrl="/" />
-                        </Show>
-                        <Show when="signed-out">
-                            <SignInButton mode="modal">
-                                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                                    Log in
-                                </Button>
-                            </SignInButton>
-                            <SignUpButton mode="modal">
-                                <Button size="sm" className="bg-gradient-to-r from-emerald-700 to-teal-600 hover:from-emerald-600 hover:to-teal-500 border-0 shadow-md shadow-emerald-500/15">
-                                    Get Started
-                                </Button>
-                            </SignUpButton>
-                        </Show>
+                        {isSignedIn ? (
+                            <>
+                                <Link href="/dashboard">
+                                    <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100">
+                                        Dashboard
+                                    </Button>
+                                </Link>
+                                <UserButton />
+                            </>
+                        ) : (
+                            <>
+                                <SignInButton mode="modal">
+                                    <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                                        Log in
+                                    </Button>
+                                </SignInButton>
+                                <SignUpButton mode="modal">
+                                    <Button size="sm" className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:from-emerald-500 hover:to-teal-400 border-0 shadow-md shadow-emerald-500/15">
+                                        Get Started
+                                    </Button>
+                                </SignUpButton>
+                            </>
+                        )}
                     </div>
 
                     {/* Mobile hamburger */}
@@ -132,22 +136,25 @@ export default function Navbar() {
                                 <Link href="/room/office" onClick={() => setMobileOpen(false)}>
                                     <Button variant="ghost" className="w-full justify-start">Try Demo</Button>
                                 </Link>
-                                <Show when="signed-in">
-                                    <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
-                                        <Button variant="outline" className="w-full justify-start text-emerald-700 border-emerald-200 bg-emerald-50">Dashboard</Button>
-                                    </Link>
-                                    <div className="px-4 py-2">
-                                        <UserButton signInUrl="/" />
-                                    </div>
-                                </Show>
-                                <Show when="signed-out">
-                                    <SignInButton mode="modal">
-                                        <Button variant="ghost" className="w-full justify-start text-gray-600">Log in</Button>
-                                    </SignInButton>
-                                    <SignUpButton mode="modal">
-                                        <Button className="w-full bg-gradient-to-r from-emerald-700 to-teal-600 border-0">Get Started</Button>
-                                    </SignUpButton>
-                                </Show>
+                                {isSignedIn ? (
+                                    <>
+                                        <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
+                                            <Button variant="outline" className="w-full justify-start text-emerald-700 border-emerald-200 bg-emerald-50">Dashboard</Button>
+                                        </Link>
+                                        <div className="px-4 py-2">
+                                            <UserButton />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <SignInButton mode="modal">
+                                            <Button variant="ghost" className="w-full justify-start text-gray-600">Log in</Button>
+                                        </SignInButton>
+                                        <SignUpButton mode="modal">
+                                            <Button className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white border-0">Get Started</Button>
+                                        </SignUpButton>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </motion.div>

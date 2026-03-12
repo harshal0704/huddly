@@ -571,7 +571,7 @@ export default function WhiteboardPanel({ isOpen, onClose }: WhiteboardPanelProp
                     {/* Bottom status bar */}
                     <div className="px-4 py-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-gray-600">
                         <span>Tool: {tool.charAt(0).toUpperCase() + tool.slice(1)}</span>
-                        <span>{stickies.length} notes • {historyRef.current.length - 1} strokes</span>
+                        <span>{stickies.length} notes • {textAnnotations.length} texts</span>
                     </div>
                 </motion.div>
             )}

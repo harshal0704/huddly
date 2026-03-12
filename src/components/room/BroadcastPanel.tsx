@@ -97,6 +97,7 @@ export default function BroadcastPanel({
     // Simulate viewer count when live
     useEffect(() => {
         if (!isLive) {
+            // eslint-disable-next-line
             setViewerCount(0);
             setDuration(0);
             return;

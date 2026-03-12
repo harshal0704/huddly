@@ -758,9 +758,7 @@ function PlayerController({ userName, onZoneChange, onNearChair, onNearInteracta
     camera.position.lerp(targetCamPos, 0.3);
 
     // Manual camera rotation
-    camera.rotation.order = "YXZ";
-    camera.rotation.y = yawRef.current;
-    camera.rotation.x = pitchRef.current;
+    camera.rotation.set(pitchRef.current, yawRef.current, 0, "YXZ");
 
     // Broadcast position (throttled)
     if (Math.random() < 0.1) {

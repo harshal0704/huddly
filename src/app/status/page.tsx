@@ -85,7 +85,9 @@ export default function StatusPage() {
             <div className="not-prose mb-8 p-4 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className="flex items-end gap-0.5 h-16">
                     {Array.from({ length: 90 }, (_, i) => {
-                        const height = 85 + Math.random() * 15;
+                        // Using a pseudo-random pure function based on index instead of Math.random()
+                        const pseudoRandom = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+                        const height = 85 + Math.abs(pseudoRandom) * 15;
                         return (
                             <div
                                 key={i}

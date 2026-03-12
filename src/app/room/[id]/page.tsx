@@ -14,6 +14,7 @@ import BroadcastPanel from "@/components/room/BroadcastPanel";
 import MeetingRoomHUD from "@/components/room/MeetingRoomHUD";
 import AvatarCustomizer from "@/components/room/AvatarCustomizer";
 import RoomBuilder from "@/components/room/RoomBuilder";
+import KeyboardShortcutsModal from "@/components/room/KeyboardShortcutsModal";
 import { useSpacesStore } from "@/stores/spacesStore";
 import { useRealtimeStore } from "@/stores/realtimeStore";
 import LiveKitWrapper from "@/components/room/LiveKitWrapper";
@@ -51,7 +52,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     const playerCount = useRealtimeStore(s => s.players.size);
 
     const { user } = useUser();
-    const userName = user?.firstName || user?.username || `Guest_${Math.floor(Math.random() * 1000)}`;
+    const [userName] = useState(() => user?.firstName || user?.username || `Guest_${Math.floor(Math.random() * 1000)}`);
 
     // UI panel states
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -63,6 +64,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
     const [isAvatarOpen, setIsAvatarOpen] = useState(false);
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+    const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
     const [currentZone, setCurrentZone] = useState("Lobby");
 
     const isInMeeting = MEETING_ZONES.includes(currentZone);
@@ -95,6 +97,18 @@ export default function RoomPage({ params }: RoomPageProps) {
         window.addEventListener("keydown", handleKey);
         return () => window.removeEventListener("keydown", handleKey);
     }, [isChatOpen, isWhiteboardOpen]);
+
+    // ? or h key to toggle shortcuts modal
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            if (e.key === "?" || e.key.toLowerCase() === "h") {
+                setIsShortcutsOpen(prev => !prev);
+            }
+        };
+        window.addEventListener("keydown", handleKey);
+        return () => window.removeEventListener("keydown", handleKey);
+    }, []);
 
     return (
         <LiveKitWrapper roomId={id as string} userName={userName}>
@@ -183,14 +197,29 @@ export default function RoomPage({ params }: RoomPageProps) {
                     roomId={id as string}
                 />
 
+                {/* Keyboard Shortcuts Modal */}
+                <KeyboardShortcutsModal
+                    isOpen={isShortcutsOpen}
+                    onClose={() => setIsShortcutsOpen(false)}
+                />
+
                 {/* Build button */}
-                <button
-                    onClick={() => setIsBuilderOpen(true)}
-                    className="fixed bottom-20 right-4 z-20 w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg transition-all hover:scale-110"
-                    title="Room Builder (B)"
-                >
-                    🏗️
-                </button>
+                <div className="fixed bottom-20 right-4 z-20 flex flex-col gap-3">
+                    <button
+                        onClick={() => setIsShortcutsOpen(true)}
+                        className="w-10 h-10 rounded-full bg-white border border-gray-200 text-gray-600 hover:text-emerald-600 hover:border-emerald-200 flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                        title="Keyboard Shortcuts (? or h)"
+                    >
+                        ?
+                    </button>
+                    <button
+                        onClick={() => setIsBuilderOpen(true)}
+                        className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                        title="Room Builder (B)"
+                    >
+                        🏗️
+                    </button>
+                </div>
 
                 {/* Bottom toolbar */}
                 <RoomToolbar

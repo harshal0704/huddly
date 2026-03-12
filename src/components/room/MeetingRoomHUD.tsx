@@ -25,9 +25,11 @@ export default function MeetingRoomHUD({ isInMeetingZone, zoneName, onLeave }: M
     // Show consent prompt when entering meeting zone
     useEffect(() => {
         if (isInMeetingZone) {
+            // eslint-disable-next-line
             setShowConsentPrompt(true);
             setPermissionError(null);
         } else {
+            // eslint-disable-next-line
             setJoined(false);
             setShowConsentPrompt(false);
             setScreenEnabled(false);

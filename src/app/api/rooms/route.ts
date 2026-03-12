@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         };
 
         // Handle password for private rooms
-        if (visibility === "password" && password) {
+        if (visibility === "private" && password) {
             // Store as plaintext for now — in production, use bcrypt
             roomData.password_hash = password;
         }

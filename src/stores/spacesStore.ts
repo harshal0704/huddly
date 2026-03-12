@@ -13,7 +13,7 @@ interface SpacesState {
     addRoom: (name: string, description: string, template: RoomTemplate, visibility: Room["visibility"], maxCapacity: number, password?: string) => Promise<Room>;
     deleteRoom: (id: string) => Promise<void>;
     duplicateRoom: (id: string) => Promise<Room | null>;
-    updateRoom: (id: string, updates: Partial<Room>) => void;
+    updateRoom: (id: string, updates: Partial<Room>) => Promise<void>;
 }
 
 // Fallback rooms for offline/error scenarios
@@ -130,10 +130,25 @@ export const useSpacesStore = create<SpacesState>((set, get) => ({
         );
     },
 
-    updateRoom: (id, updates) =>
+    updateRoom: async (id, updates) => {
+        const prevRooms = get().rooms;
+        // Optimistic update
         set((state) => ({
             rooms: state.rooms.map((r) =>
                 r.id === id ? { ...r, ...updates, updatedAt: new Date() } : r
             ),
-        })),
+        }));
+
+        try {
+            const res = await fetch(`/api/rooms/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updates),
+            });
+            if (!res.ok) throw new Error("Failed to update room");
+        } catch {
+            // Revert on failure
+            set({ rooms: prevRooms });
+        }
+    },
 }));
