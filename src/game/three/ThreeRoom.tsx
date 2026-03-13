@@ -298,11 +298,7 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
   const { camera } = useThree();
   const [isNear, setIsNear] = useState(false);
 
-  const tracks = useTracks([
-    { source: Track.Source.ScreenShare, withPlaceholder: false }
-  ], { onlySubscribed: false });
-
-  const activeTrack = tracks.find(t => t.source === Track.Source.ScreenShare);
+  const { activeScreenTrack: activeTrack } = React.useContext(LiveKitTrackContext);
 
   useFrame((s) => {
     if (ref.current) {
@@ -1762,10 +1758,7 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
   const players = useRealtimeStore(s => s.players);
   const myId = useRealtimeStore(s => s.myId);
 
-  const tracks = useTracks([
-    { source: Track.Source.Camera, withPlaceholder: false },
-    { source: Track.Source.Microphone, withPlaceholder: false }
-  ], { onlySubscribed: true });
+  const { pcTracks } = React.useContext(LiveKitTrackContext);
 
   return (
     <>
@@ -1791,8 +1784,8 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
       {/* Render live players */}
       {Array.from(players.values()).map(p => {
         if (p.id === myId) return null;
-        const pCamTrack = tracks.find(t => t.participant.name === p.name && t.source === Track.Source.Camera);
-        const pMicTrack = tracks.find(t => t.participant.name === p.name && t.source === Track.Source.Microphone);
+        const pCamTrack = pcTracks.find((t: any) => t.participant.name === p.name && t.source === Track.Source.Camera);
+        const pMicTrack = pcTracks.find((t: any) => t.participant.name === p.name && t.source === Track.Source.Microphone);
         return (
           <group key={p.id} position={[p.x, p.y, p.z]}>
             <Avatar color={p.color} name={p.name} cameraTrack={pCamTrack} audioTrack={pMicTrack} />
@@ -1817,6 +1810,9 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
 /* ═══════════════════════════════════════════════════════════════
    EXPORTED COMPONENT
    ═══════════════════════════════════════════════════════════════ */
+
+export const LiveKitTrackContext = React.createContext<{ pcTracks: any[], activeScreenTrack: any | null }>({ pcTracks: [], activeScreenTrack: null });
+
 export default function ThreeRoom({ roomId, userName = "You", template = "office", customObjects }: ThreeRoomProps) {
   const [currentZone, setCurrentZone] = useState("Lobby");
   const [nearChair, setNearChair] = useState(false);
@@ -1825,6 +1821,16 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
   const [entered, setEntered] = useState(false);
   const connect = useRealtimeStore(s => s.connect);
   const disconnect = useRealtimeStore(s => s.disconnect);
+
+  const pcTracks = useTracks([
+    { source: Track.Source.Camera, withPlaceholder: false },
+    { source: Track.Source.Microphone, withPlaceholder: false }
+  ], { onlySubscribed: true });
+
+  const screenTracks = useTracks([
+    { source: Track.Source.ScreenShare, withPlaceholder: false }
+  ], { onlySubscribed: false });
+  const activeScreenTrack = screenTracks.find(t => t.source === Track.Source.ScreenShare) || null;
 
   useEffect(() => {
     connect(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001", userName, roomId);
@@ -1877,17 +1883,19 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
         camera={{ position: [0, 1.25, 24], fov: 60, near: 0.1, far: 200 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.4 }}
       >
-        <Scene
-          userName={userName}
-          onZoneChange={setCurrentZone}
-          onNearChair={setNearChair}
-          onNearInteractable={setNearInteractable}
-          onInteract={handleInteract}
-          template={template}
-          fpsMode={fpsMode}
-          onFpsModeChange={handleFpsModeChange}
-          customObjects={customObjects}
-        />
+        <LiveKitTrackContext.Provider value={{ pcTracks, activeScreenTrack }}>
+          <Scene
+            userName={userName}
+            onZoneChange={setCurrentZone}
+            onNearChair={setNearChair}
+            onNearInteractable={setNearInteractable}
+            onInteract={handleInteract}
+            template={template}
+            fpsMode={fpsMode}
+            onFpsModeChange={handleFpsModeChange}
+            customObjects={customObjects}
+          />
+        </LiveKitTrackContext.Provider>
       </Canvas>
 
       {/* Zone indicator */}

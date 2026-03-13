@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Radio, X, Eye, Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Users, AlertCircle } from "lucide-react";
 
-import { useLocalParticipant, useTracks } from "@livekit/components-react";
+import { useLocalParticipant, useTracks, useRemoteParticipants } from "@livekit/components-react";
 import { Track } from "livekit-client";
 
 interface BroadcastPanelProps {
@@ -94,29 +94,29 @@ export default function BroadcastPanel({
         setIsLive(false);
     };
 
-    // Simulate viewer count when live
+    const participants = useRemoteParticipants();
     useEffect(() => {
         if (!isLive) {
-            // eslint-disable-next-line
-            setViewerCount(0);
             setDuration(0);
             return;
         }
-        setViewerCount(3 + Math.floor(Math.random() * 5));
-        const viewerInterval = setInterval(() => {
-            setViewerCount((prev) => {
-                const delta = Math.floor(Math.random() * 3) - 1;
-                return Math.max(1, Math.min(prev + delta, 50));
-            });
-        }, 2000);
+
         const durationInterval = setInterval(() => {
             setDuration((prev) => prev + 1);
         }, 1000);
         return () => {
-            clearInterval(viewerInterval);
             clearInterval(durationInterval);
         };
     }, [isLive]);
+
+    // Calculate real viewers
+    useEffect(() => {
+        if (isLive) {
+            setViewerCount(participants.length + 1);
+        } else {
+            setViewerCount(0);
+        }
+    }, [participants.length, isLive]);
 
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
