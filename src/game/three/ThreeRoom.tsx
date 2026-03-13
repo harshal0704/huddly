@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Text, RoundedBox, Float, Sparkles, Sky, Html, Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import { useRealtimeStore } from "@/stores/realtimeStore";
-import { useTracks, ParticipantTile } from "@livekit/components-react";
+import { useTracks, RoomContext, useRoomContext, ParticipantTile } from "@livekit/components-react";
 import { Track } from "livekit-client";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -298,7 +298,7 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
   const { camera } = useThree();
   const [isNear, setIsNear] = useState(false);
 
-  const { activeScreenTrack: activeTrack } = React.useContext(LiveKitTrackContext);
+  const { activeScreenTrack: activeTrack, room } = React.useContext(LiveKitTrackContext);
 
   useFrame((s) => {
     if (ref.current) {
@@ -319,16 +319,22 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
       </RoundedBox>
       <mesh ref={ref} position={[0, 0, 0.05]}>
         <planeGeometry args={size} />
-        {activeTrack && isNear ? (
+        {activeTrack ? (
           <meshBasicMaterial color="#000" />
         ) : (
           <meshStandardMaterial color="#0a1a10" emissive={P.green} emissiveIntensity={0.3} roughness={0.1} metalness={0.9} />
         )}
       </mesh>
-      {activeTrack && isNear && (
+      {activeTrack && (
         <Html position={[0, 0, 0.06]} transform distanceFactor={1.5} center zIndexRange={[100, 0]} style={{ width: `${size[0] * 200}px`, height: `${size[1] * 200}px` }}>
           <div className="w-full h-full overflow-hidden [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover" style={{ pointerEvents: 'none' }}>
-            <ParticipantTile trackRef={activeTrack} />
+            {room ? (
+              <RoomContext.Provider value={room}>
+                <ParticipantTile trackRef={activeTrack} />
+              </RoomContext.Provider>
+            ) : (
+              <ParticipantTile trackRef={activeTrack} />
+            )}
           </div>
         </Html>
       )}
@@ -1811,7 +1817,7 @@ function Scene({ userName, onZoneChange, onNearChair, onNearInteractable, onInte
    EXPORTED COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 
-export const LiveKitTrackContext = React.createContext<{ pcTracks: any[], activeScreenTrack: any | null }>({ pcTracks: [], activeScreenTrack: null });
+export const LiveKitTrackContext = React.createContext<{ pcTracks: any[], activeScreenTrack: any | null, room: any | null }>({ pcTracks: [], activeScreenTrack: null, room: null });
 
 export default function ThreeRoom({ roomId, userName = "You", template = "office", customObjects }: ThreeRoomProps) {
   const [currentZone, setCurrentZone] = useState("Lobby");
@@ -1821,6 +1827,7 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
   const [entered, setEntered] = useState(false);
   const connect = useRealtimeStore(s => s.connect);
   const disconnect = useRealtimeStore(s => s.disconnect);
+  const room = useRoomContext();
 
   const pcTracks = useTracks([
     { source: Track.Source.Camera, withPlaceholder: false },
@@ -1883,7 +1890,7 @@ export default function ThreeRoom({ roomId, userName = "You", template = "office
         camera={{ position: [0, 1.25, 24], fov: 60, near: 0.1, far: 200 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.4 }}
       >
-        <LiveKitTrackContext.Provider value={{ pcTracks, activeScreenTrack }}>
+        <LiveKitTrackContext.Provider value={{ pcTracks, activeScreenTrack, room }}>
           <Scene
             userName={userName}
             onZoneChange={setCurrentZone}
