@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Radio, X, Eye, Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Users, AlertCircle } from "lucide-react";
 
 import { useLocalParticipant, useTracks, useRemoteParticipants } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { Track, createLocalVideoTrack, LocalVideoTrack } from "livekit-client";
 
 interface BroadcastPanelProps {
     isOpen: boolean;
@@ -22,6 +22,8 @@ export default function BroadcastPanel({
     const [errorMsg, setErrorMsg] = useState("");
     const videoRef = useRef<HTMLVideoElement>(null);
     const screenRef = useRef<HTMLVideoElement>(null);
+
+    const [broadcastMode, setBroadcastMode] = useState<"screen" | "camera">("screen");
 
     const { localParticipant } = useLocalParticipant();
     const tracks = useTracks([
@@ -67,25 +69,49 @@ export default function BroadcastPanel({
     const handleGoLive = async () => {
         try {
             setErrorMsg("");
-            if (!isScreenSharing) {
-                await localParticipant.setScreenShareEnabled(true);
+            if (broadcastMode === "screen") {
+                if (!isScreenSharing) {
+                    await localParticipant.setScreenShareEnabled(true);
+                }
+                if (isCameraOff) {
+                    await localParticipant.setCameraEnabled(true);
+                }
+            } else {
+                // Publish local camera specifically as a screenshare source so the 3D TV picks it up automatically
+                if (isCameraOff) {
+                    await localParticipant.setCameraEnabled(true);
+                }
+                const track = await createLocalVideoTrack({ facingMode: "user" });
+                await localParticipant.publishTrack(track, {
+                    name: "camera_broadcast",
+                    source: Track.Source.ScreenShare
+                });
             }
-            if (isCameraOff) {
-                await localParticipant.setCameraEnabled(true);
-            }
+
             if (isMuted) {
                 await localParticipant.setMicrophoneEnabled(true);
             }
             setIsLive(true);
         } catch (e: any) {
             console.error("Failed to go live:", e);
-            setErrorMsg(e.message || "Failed to start screen share.");
+            setErrorMsg(e.message || "Failed to start broadcast.");
         }
     };
 
     const handleStopBroadcast = async () => {
         try {
-            if (isScreenSharing) await localParticipant.setScreenShareEnabled(false);
+            if (broadcastMode === "screen") {
+                if (isScreenSharing) await localParticipant.setScreenShareEnabled(false);
+            } else {
+                // Find and unpublish the hijacked camera track
+                const pub = Array.from(localParticipant.trackPublications.values()).find(
+                    p => p.source === Track.Source.ScreenShare && p.trackName === "camera_broadcast"
+                );
+                if (pub && pub.track) {
+                    await localParticipant.unpublishTrack(pub.track as LocalVideoTrack, true);
+                }
+            }
+
             if (!isCameraOff) await localParticipant.setCameraEnabled(false);
             if (!isMuted) await localParticipant.setMicrophoneEnabled(false);
         } catch (e) {
@@ -273,13 +299,29 @@ export default function BroadcastPanel({
 
                         {/* Go Live / Stop */}
                         {!isLive ? (
-                            <button
-                                onClick={handleGoLive}
-                                className="w-full py-3 rounded-xl bg-[#007AFF] hover:bg-[#0066CC] text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-[0_4px_14px_rgba(0,122,255,0.3)] hover:shadow-[0_6px_20px_rgba(0,122,255,0.4)]"
-                            >
-                                <Radio className="w-4 h-4" />
-                                Start Broadcasting
-                            </button>
+                            <div className="space-y-3">
+                                <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                                    <button
+                                        onClick={() => setBroadcastMode("screen")}
+                                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${broadcastMode === "screen" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+                                    >
+                                        Screen
+                                    </button>
+                                    <button
+                                        onClick={() => setBroadcastMode("camera")}
+                                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${broadcastMode === "camera" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+                                    >
+                                        Camera
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={handleGoLive}
+                                    className="w-full py-3 rounded-xl bg-[#007AFF] hover:bg-[#0066CC] text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-[0_4px_14px_rgba(0,122,255,0.3)] hover:shadow-[0_6px_20px_rgba(0,122,255,0.4)]"
+                                >
+                                    <Radio className="w-4 h-4" />
+                                    Start Broadcasting
+                                </button>
+                            </div>
                         ) : (
                             <button
                                 onClick={handleStopBroadcast}

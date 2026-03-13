@@ -100,7 +100,8 @@ const COLLIDERS: AABB[] = [
 /* ═══════════════════════════════════════════════════════════════
    COLLISION HELPER
    ═══════════════════════════════════════════════════════════════ */
-function wouldCollide(x: number, z: number, r: number = 0.4): boolean {
+function wouldCollide(x: number, z: number, template: string = "office", r: number = 0.4): boolean {
+  if (template !== "office") return false;
   for (const c of COLLIDERS) {
     if (x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ) return true;
   }
@@ -327,7 +328,7 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
       </mesh>
       {activeTrack && (
         <Html position={[0, 0, 0.06]} transform distanceFactor={1.5} center zIndexRange={[100, 0]} style={{ width: `${size[0] * 200}px`, height: `${size[1] * 200}px` }}>
-          <div className="w-full h-full overflow-hidden [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover" style={{ pointerEvents: 'none' }}>
+          <div className="w-full h-full overflow-hidden [&_.lk-participant-tile]:!w-full [&_.lk-participant-tile]:!h-full [&_.lk-participant-tile]:!absolute [&_.lk-participant-tile]:!inset-0 [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover [&_.lk-participant-metadata]:!hidden [&_.lk-focus-toggle-button]:!hidden" style={{ pointerEvents: 'none' }}>
             {room ? (
               <RoomContext.Provider value={room}>
                 <ParticipantTile trackRef={activeTrack} />
@@ -619,6 +620,20 @@ const TEMPLATE_SPAWNS: Record<string, [number, number, number]> = {
   custom: [0, 0.6, 12],
 };
 
+const TEMPLATE_BOUNDS: Record<string, { minX: number; maxX: number; minZ: number; maxZ: number }> = {
+  office: { minX: -28, maxX: 28, minZ: -28, maxZ: 28 },
+  cafe: { minX: -19, maxX: 19, minZ: -14, maxZ: 14 },
+  party: { minX: -9.5, maxX: 9.5, minZ: -9.5, maxZ: 9.5 },
+  classroom: { minX: -19, maxX: 19, minZ: -14, maxZ: 14 },
+  conference: { minX: -24, maxX: 24, minZ: -19, maxZ: 19 },
+  library: { minX: -19, maxX: 19, minZ: -14, maxZ: 14 },
+  gaming: { minX: -19, maxX: 19, minZ: -14, maxZ: 14 },
+  rooftop: { minX: -19, maxX: 19, minZ: -14, maxZ: 14 },
+  theater: { minX: -24, maxX: 24, minZ: -19, maxZ: 19 },
+  blank: { minX: -19, maxX: 19, minZ: -14, maxZ: 14 },
+  custom: { minX: -19, maxX: 19, minZ: -14, maxZ: 14 },
+};
+
 function PlayerController({ userName, onZoneChange, onNearChair, onNearInteractable, onInteract, fpsMode, onFpsModeChange, template = "office" }: {
   userName: string;
   onZoneChange: (z: string) => void;
@@ -758,11 +773,13 @@ function PlayerController({ userName, onZoneChange, onNearChair, onNearInteracta
       const nx = ref.current.position.x + direction.x;
       const nz = ref.current.position.z + direction.z;
 
-      const clampX = Math.max(-28, Math.min(28, nx));
-      const clampZ = Math.max(-28, Math.min(28, nz));
+      const bounds = TEMPLATE_BOUNDS[template] || TEMPLATE_BOUNDS.office;
 
-      if (!wouldCollide(clampX, ref.current.position.z, 0.35)) ref.current.position.x = clampX;
-      if (!wouldCollide(ref.current.position.x, clampZ, 0.35)) ref.current.position.z = clampZ;
+      const clampX = Math.max(bounds.minX, Math.min(bounds.maxX, nx));
+      const clampZ = Math.max(bounds.minZ, Math.min(bounds.maxZ, nz));
+
+      if (!wouldCollide(clampX, ref.current.position.z, template, 0.35)) ref.current.position.x = clampX;
+      if (!wouldCollide(ref.current.position.x, clampZ, template, 0.35)) ref.current.position.z = clampZ;
     }
 
     const zone = getZone(ref.current.position.x, ref.current.position.z);
