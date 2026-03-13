@@ -118,7 +118,6 @@ export default function Hero() {
 
                     {/* Render World Showcase (Replaces Abstract Mockup) */}
                     <motion.div
-                        style={{ y: y1, opacity: opacityFade, scale: scaleFade }}
                         initial={{ opacity: 0, y: 60 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 1, delay: 0.4, type: "spring", damping: 20 }}
