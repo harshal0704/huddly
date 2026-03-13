@@ -61,7 +61,7 @@ export default function BroadcastPanel({
                 localScreenTrack.detach(el);
             }
         };
-    }, [localScreenTrack]);
+    }, [localScreenTrack, isScreenSharing]);
 
     // When going live, make sure media is started
     const handleGoLive = async () => {

@@ -6,6 +6,19 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Video, Users, MessageSquare, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SignUpButton, useUser } from "@clerk/nextjs";
+import dynamic from "next/dynamic";
+
+const HeroScene = dynamic(() => import("./HeroScene"), {
+    ssr: false,
+    loading: () => (
+        <div className="w-full h-full flex items-center justify-center bg-gray-50/50 rounded-3xl border border-gray-100">
+            <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+                <span className="text-xs text-emerald-600 font-medium">Loading 3D World...</span>
+            </div>
+        </div>
+    )
+});
 
 export default function Hero() {
     const sectionRef = useRef<HTMLDivElement>(null);
@@ -103,7 +116,7 @@ export default function Hero() {
                         )}
                     </motion.div>
 
-                    {/* UI Mockup Showcase (Replaces 3D Canvas) */}
+                    {/* Render World Showcase (Replaces Abstract Mockup) */}
                     <motion.div
                         style={{ y: y1, opacity: opacityFade, scale: scaleFade }}
                         initial={{ opacity: 0, y: 60 }}
@@ -116,80 +129,16 @@ export default function Hero() {
                             <div className="absolute inset-0 bg-gradient-to-br from-white/60 to-white/20 z-0" />
 
                             {/* Inner Screen */}
-                            <div className="relative z-10 rounded-[24px] overflow-hidden bg-gray-50 border border-gray-100 w-full aspect-[16/10] md:aspect-[21/9] flex items-center justify-center shadow-inner">
+                            <div className="relative z-10 rounded-[24px] overflow-hidden bg-[#e8e0d0] border border-gray-100 w-full aspect-[16/10] md:aspect-[21/9] flex items-center justify-center shadow-inner group">
+                                <HeroScene />
 
-                                {/* Abstract UI Elements */}
-                                <div className="absolute inset-0" style={{
-                                    backgroundImage: 'radial-gradient(#e5e7eb 1px, transparent 1px)',
-                                    backgroundSize: '24px 24px',
-                                }}>
-                                    <div className="absolute inset-0 bg-gradient-to-t from-gray-50 via-transparent to-transparent" />
+                                {/* UI Overlay over the 3D scene */}
+                                <div className="absolute top-4 left-4 z-20 pointer-events-none">
+                                    <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-gray-200/50 shadow-sm flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="text-xs font-semibold text-gray-700">Huddly Office · 12 online</span>
+                                    </div>
                                 </div>
-
-                                {/* Mock floating video panels */}
-                                <motion.div
-                                    initial={{ y: 20, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    transition={{ delay: 0.8, type: "spring" }}
-                                    className="absolute left-[15%] top-[20%] w-48 h-32 bg-white rounded-2xl shadow-xl border border-gray-100 flex items-center justify-center rotate-[-2deg]"
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-                                        <Users className="w-5 h-5 text-emerald-600" />
-                                    </div>
-                                    <div className="absolute bottom-3 left-4 right-4 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                        <motion.div
-                                            animate={{ width: ["20%", "80%", "40%"] }}
-                                            transition={{ duration: 2, repeat: Infinity }}
-                                            className="h-full bg-emerald-400"
-                                        />
-                                    </div>
-                                </motion.div>
-
-                                <motion.div
-                                    initial={{ y: 20, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    transition={{ delay: 1, type: "spring" }}
-                                    className="absolute right-[15%] bottom-[20%] w-56 h-36 bg-gray-900 rounded-2xl shadow-xl shadow-gray-900/20 border border-gray-800 flex items-center justify-center rotate-[3deg]"
-                                >
-                                    <div className="absolute top-4 left-4 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700">
-                                        <Video className="w-5 h-5 text-gray-300" />
-                                    </div>
-                                    <div className="absolute bottom-4 left-4 right-4 flex gap-2">
-                                        <div className="flex-1 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
-                                            <MessageSquare className="w-3.5 h-3.5 text-gray-400" />
-                                        </div>
-                                        <div className="flex-1 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                                            <span className="text-xs text-emerald-400 font-medium font-mono">LIVE</span>
-                                        </div>
-                                    </div>
-                                </motion.div>
-
-                                {/* Center Hub */}
-                                <motion.div
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ delay: 0.6, type: "spring", bounce: 0.4 }}
-                                    className="relative w-24 h-24 rounded-3xl bg-white shadow-2xl shadow-emerald-500/20 border border-gray-100 flex items-center justify-center z-20"
-                                >
-                                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 pointer-events-none" />
-                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-inner">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
-                                    </div>
-
-                                    {/* Ripples */}
-                                    <motion.div
-                                        className="absolute inset-0 rounded-3xl border border-emerald-500"
-                                        animate={{ scale: [1, 2], opacity: [0.5, 0] }}
-                                        transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
-                                    />
-                                    <motion.div
-                                        className="absolute inset-0 rounded-3xl border border-teal-500"
-                                        animate={{ scale: [1, 2], opacity: [0.5, 0] }}
-                                        transition={{ duration: 2, repeat: Infinity, delay: 1, ease: "easeOut" }}
-                                    />
-                                </motion.div>
-
                             </div>
                         </div>
                     </motion.div>

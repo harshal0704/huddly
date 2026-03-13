@@ -300,7 +300,7 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
 
   const tracks = useTracks([
     { source: Track.Source.ScreenShare, withPlaceholder: false }
-  ], { onlySubscribed: true });
+  ], { onlySubscribed: false });
 
   const activeTrack = tracks.find(t => t.source === Track.Source.ScreenShare);
 
@@ -334,6 +334,20 @@ function BroadcastScreen({ position, rotation = [0, 0, 0] as [number, number, nu
           <div className="w-full h-full overflow-hidden [&_.lk-participant-tile]:w-full [&_.lk-participant-tile]:h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover" style={{ pointerEvents: 'none' }}>
             <ParticipantTile trackRef={activeTrack} />
           </div>
+        </Html>
+      )}
+      {!activeTrack && isNear && (
+        <Html position={[0, 0, 0.06]} transform distanceFactor={1.5} center zIndexRange={[100, 0]}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent("huddly:interact", { detail: { type: "broadcast" } }));
+            }}
+            className="px-4 py-2 bg-[#007AFF]/90 hover:bg-[#007AFF] text-white rounded-lg text-sm font-semibold shadow-lg backdrop-blur-md transition-all flex items-center gap-2 pointer-events-auto cursor-pointer"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Share Screen
+          </button>
         </Html>
       )}
     </group>
